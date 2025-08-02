@@ -4,6 +4,8 @@ from contextlib import asynccontextmanager
 from app.database import init_database, check_database_health, cleanup_database
 from app.auth_routes import router as auth_router
 from app.upload_routes import router as upload_router
+from app.detection_routes import router as detection_router
+from app.analysis_routes import router as analysis_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,9 +31,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers (without additional prefixes since they already have them)
+# Include routers
 app.include_router(auth_router)
 app.include_router(upload_router)
+app.include_router(detection_router)
+app.include_router(analysis_router, prefix="/api")
 
 @app.get("/")
 async def root():
