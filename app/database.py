@@ -1,89 +1,39 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import StaticPool
-from contextlib import contextmanager
-from typing import Generator
+from sqlalchemy.exc import SQLAlchemyError
 import os
-import time
+from pathlib import Path
 
 # Database configuration
 DATABASE_URL = "sqlite:///./deepfake.db"
-
-# Create SQLAlchemy engine
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={
-        "check_same_thread": False,  # Needed for SQLite
-    },
-    poolclass=StaticPool,  # Use static pool for SQLite
-    echo=False,  # Set to True for SQL query logging
-)
-
-# Create SessionLocal class
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Create Base class for models
 Base = declarative_base()
 
-# Database initialization function
-def init_database():
-    """Initialize the database by creating all tables"""
+def get_db():
+    """Dependency to get database session"""
+    db = SessionLocal()
     try:
-        # Import all models here to ensure they are registered with Base
+        yield db
+    finally:
+        db.close()
+
+def init_database():
+    """Initialize database and create tables"""
+    try:
+        # Import models to ensure they are registered
         from app.models.user import User
+        from app.models.media_file import MediaFile
         from app.models.detection_result import DetectionResult
         
-        # Create all tables
+        # Create tables
         Base.metadata.create_all(bind=engine)
         print("✅ Database initialized successfully")
     except Exception as e:
         print(f"❌ Database initialization failed: {e}")
         raise
 
-# Database session dependency for FastAPI
-def get_db() -> Generator[Session, None, None]:
-    """Dependency to get database session for FastAPI"""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# Context manager for database sessions
-@contextmanager
-def get_db_session() -> Generator[Session, None, None]:
-    """Context manager for database sessions"""
-    db = SessionLocal()
-    try:
-        yield db
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
-
-# Database health check function
-def check_database_health() -> dict:
-    """Check database connectivity and health"""
-    try:
-        with get_db_session() as db:
-            # Try a simple query
-            db.execute("SELECT 1")
-            return {
-                "status": "healthy",
-                "database": "deepfake.db",
-                "connection": "active"
-            }
-    except Exception as e:
-        return {
-            "status": "unhealthy",
-            "database": "deepfake.db",
-            "error": str(e)
-        }
-
-# Database cleanup function
 def cleanup_database():
     """Clean up database connections"""
     try:
@@ -92,29 +42,68 @@ def cleanup_database():
     except Exception as e:
         print(f"❌ Database cleanup failed: {e}")
 
-# Database file management
-def get_database_size() -> int:
-    """Get the size of the database file in bytes"""
+def check_database_health():
+    """Check database health and connectivity"""
     try:
-        if os.path.exists("deepfake.db"):
-            return os.path.getsize("deepfake.db")
-        return 0
-    except Exception:
-        return 0
+        # Test database connection using SQLAlchemy 2.0 syntax
+        with engine.connect() as connection:
+            result = connection.execute(text("SELECT 1"))
+            result.fetchone()
+        
+        # Test session creation and basic operations
+        db = SessionLocal()
+        try:
+            # Test if we can query the database
+            result = db.execute(text("SELECT COUNT(*) FROM users"))
+            result.scalar()
+            db.commit()
+            
+            return {
+                "status": "healthy",
+                "database": "deepfake.db",
+                "connection": "successful",
+                "tables": ["users", "media_files", "detection_results"]
+            }
+        finally:
+            db.close()
+            
+    except SQLAlchemyError as e:
+        return {
+            "status": "unhealthy",
+            "database": "deepfake.db",
+            "error": str(e),
+            "connection": "failed"
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "database": "deepfake.db",
+            "error": str(e),
+            "connection": "unknown_error"
+        }
 
-def backup_database(backup_path: str = None) -> bool:
-    """Create a backup of the database"""
+def test_database_operations():
+    """Test basic database operations"""
     try:
-        if not os.path.exists("deepfake.db"):
-            return False
+        db = SessionLocal()
         
-        if backup_path is None:
-            backup_path = f"deepfake_backup_{int(time.time())}.db"
+        # Test user table
+        result = db.execute(text("SELECT COUNT(*) FROM users"))
+        user_count = result.scalar()
+        print(f"Users in database: {user_count}")
         
-        import shutil
-        shutil.copy2("deepfake.db", backup_path)
-        print(f"✅ Database backed up to {backup_path}")
+        # Test media_files table
+        result = db.execute(text("SELECT COUNT(*) FROM media_files"))
+        file_count = result.scalar()
+        print(f"Files in database: {file_count}")
+        
+        # Test detection_results table
+        result = db.execute(text("SELECT COUNT(*) FROM detection_results"))
+        result_count = result.scalar()
+        print(f"Detection results in database: {result_count}")
+        
+        db.close()
         return True
     except Exception as e:
-        print(f"❌ Database backup failed: {e}")
+        print(f"Database operation test failed: {e}")
         return False

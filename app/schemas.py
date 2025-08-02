@@ -29,3 +29,14 @@ class AuthResponse(BaseModel):
     token_type: str
     expires_in: int
     user: UserResponse
+class UploadResponse(BaseModel):
+    """Schema for file upload response"""
+    file_id: int
+    filename: str
+    file_size: int
+    file_type: str
+    upload_time: datetime
+    message: str
+    
+    class Config:
+        from_attributes = True
