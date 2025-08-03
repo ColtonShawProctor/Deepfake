@@ -104,6 +104,9 @@ class DetectionResponse(BaseModel):
     message: str
     file_id: int
     filename: str
+    file_url: Optional[str] = None
+    file_size: Optional[int] = None
+    file_type: Optional[str] = None
     detection_result: DetectionResult
     created_at: datetime
 

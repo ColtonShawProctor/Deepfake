@@ -276,3 +276,38 @@ async def serve_file(
             "Cache-Control": "public, max-age=3600"
         }
     )
+
+@router.get("/files/public/{file_id}")
+async def serve_file_public(
+    file_id: int,
+    db: Session = Depends(get_db)
+):
+    """Serve a file publicly (for image display) - basic security check"""
+    media_file = db.query(MediaFile).filter(
+        MediaFile.id == file_id
+    ).first()
+    
+    if not media_file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found"
+        )
+    
+    file_path = Path(media_file.file_path)
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found on disk"
+        )
+    
+    content_type = media_file.file_type or "application/octet-stream"
+    
+    return FileResponse(
+        path=file_path,
+        filename=media_file.filename,
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f"inline; filename={media_file.filename}",
+            "Cache-Control": "public, max-age=3600"
+        }
+    )

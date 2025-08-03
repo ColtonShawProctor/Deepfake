@@ -179,11 +179,17 @@ async def get_analysis_results(
         "error": None
     }
     
+    # Construct file URL for frontend (using public endpoint for image display)
+    file_url = f"/api/files/public/{media_file.id}"
+    
     return DetectionResponse(
         success=True,
         message="Analysis results retrieved successfully",
         file_id=media_file.id,
         filename=media_file.filename,
+        file_url=file_url,
+        file_size=media_file.file_size,
+        file_type=media_file.file_type,
         detection_result=api_detection_result,
         created_at=detection_result.analysis_time
     )
@@ -235,11 +241,17 @@ async def get_analysis_history(
                 "error": None
             }
             
+            # Construct file URL for frontend (using public endpoint for image display)
+            file_url = f"/api/files/public/{media_file.id}"
+            
             response_list.append(DetectionResponse(
                 success=True,
                 message="Analysis result retrieved successfully",
                 file_id=media_file.id,
                 filename=media_file.filename,
+                file_url=file_url,
+                file_size=media_file.file_size,
+                file_type=media_file.file_type,
                 detection_result=api_detection_result,
                 created_at=result.analysis_time
             ))
