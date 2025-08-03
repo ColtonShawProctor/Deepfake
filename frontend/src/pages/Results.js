@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { analysisAPI } from '../services/api';
 import { useApiError } from '../hooks/useApiError';
@@ -12,14 +12,23 @@ const Results = () => {
   const [retryLoading, setRetryLoading] = useState(false);
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [message, setMessage] = useState('');
-
+  
+  // Use ref to track if we've already fetched for this fileId
+  const hasFetchedRef = useRef(false);
+  const currentFileIdRef = useRef(null);
 
   const fetchResult = useCallback(async () => {
-    // Prevent multiple simultaneous fetches
-    if (loading) return;
+    // Prevent multiple simultaneous fetches and duplicate fetches for same fileId
+    if (loading || (hasFetchedRef.current && currentFileIdRef.current === fileId)) {
+      return;
+    }
     
     setLoading(true);
     clearError();
+    
+    // Mark that we're fetching for this fileId
+    hasFetchedRef.current = true;
+    currentFileIdRef.current = fileId;
     
     try {
       // Add timeout to prevent hanging
@@ -69,6 +78,11 @@ const Results = () => {
 
   useEffect(() => {
     if (fileId) {
+      // Reset fetch flag when fileId changes
+      if (currentFileIdRef.current !== fileId) {
+        hasFetchedRef.current = false;
+        currentFileIdRef.current = fileId;
+      }
       fetchResult();
     }
   }, [fileId, fetchResult]);
@@ -77,6 +91,9 @@ const Results = () => {
     setRetryLoading(true);
     clearError();
     setMessage('');
+    
+    // Reset fetch flag to allow new fetch after retry
+    hasFetchedRef.current = false;
     
     try {
       console.log('Retrying analysis for file ID:', fileId);
