@@ -8,6 +8,9 @@ import random
 import time
 from datetime import datetime
 
+# Import enhanced detector
+from .enhanced_deepfake_detector import EnhancedDeepfakeDetector
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,8 +23,20 @@ class DeepfakeDetector:
     fake results based on basic image analysis until a real ML model is integrated.
     """
     
-    def __init__(self):
+    def __init__(self, use_enhanced: bool = True):
         self.logger = logging.getLogger(__name__)
+        
+        # Initialize enhanced detector if requested
+        self.enhanced_detector = None
+        if use_enhanced:
+            try:
+                self.enhanced_detector = EnhancedDeepfakeDetector(use_ensemble=True)
+                self.logger.info("Enhanced DeepfakeDetector initialized with multi-model ensemble")
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize enhanced detector: {str(e)}")
+                self.logger.info("Falling back to mock detector")
+                self.enhanced_detector = None
+        
         self.logger.info("DeepfakeDetector initialized")
     
     def analyze_image(self, image_path: str) -> Dict[str, Any]:
@@ -46,6 +61,14 @@ class DeepfakeDetector:
         start_time = time.time()
         
         try:
+            # Use enhanced detector if available
+            if self.enhanced_detector:
+                self.logger.info("Using enhanced multi-model detector")
+                return self.enhanced_detector.analyze_image(image_path)
+            
+            # Fallback to mock analysis
+            self.logger.info("Using mock detector (enhanced detector not available)")
+            
             # Validate file exists
             if not os.path.exists(image_path):
                 raise FileNotFoundError(f"Image file not found: {image_path}")
@@ -258,6 +281,9 @@ class DeepfakeDetector:
         """
         Get information about the detector service.
         """
+        if self.enhanced_detector:
+            return self.enhanced_detector.get_detector_info()
+        
         return {
             "name": "Mock Deepfake Detector",
             "version": "1.0.0",
