@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { analysisAPI } from '../services/api';
 import { useApiError } from '../hooks/useApiError';
@@ -13,13 +13,7 @@ const Results = () => {
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [message, setMessage] = useState('');
 
-  useEffect(() => {
-    if (fileId) {
-      fetchResult();
-    }
-  }, [fileId, fetchResult]);
-
-  const fetchResult = async () => {
+  const fetchResult = useCallback(async () => {
     setLoading(true);
     clearError();
     
@@ -64,7 +58,13 @@ const Results = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [fileId, clearError, handleError]);
+
+  useEffect(() => {
+    if (fileId) {
+      fetchResult();
+    }
+  }, [fileId, fetchResult]);
 
   const handleRetryAnalysis = async () => {
     setRetryLoading(true);

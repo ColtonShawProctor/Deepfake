@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/AuthContext';
 import { analysisAPI } from '../services/api';
@@ -19,7 +19,7 @@ const Dashboard = () => {
   const [recentUploads, setRecentUploads] = useState([]);
   const [refreshLoading, setRefreshLoading] = useState(false);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     setLoading(true);
     clearError();
     
@@ -44,7 +44,7 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [clearError, handleError]);
 
   const handleRefresh = async () => {
     setRefreshLoading(true);

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fileAPI, analysisAPI } from '../services/api';
 import { useApiError } from '../hooks/useApiError';
@@ -19,9 +19,9 @@ const Upload = () => {
   const [validationErrors, setValidationErrors] = useState({});
 
   // File validation constants
-  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-  const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/webp'];
-  const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
+  const MAX_FILE_SIZE = useMemo(() => 10 * 1024 * 1024, []); // 10MB
+  const ALLOWED_TYPES = useMemo(() => ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/webp'], []);
+  const ALLOWED_EXTENSIONS = useMemo(() => ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'], []);
 
   const validateFile = useCallback((file) => {
     const errors = {};
