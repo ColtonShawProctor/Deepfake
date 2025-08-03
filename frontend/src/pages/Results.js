@@ -14,13 +14,21 @@ const Results = () => {
   const [message, setMessage] = useState('');
 
 
-
   const fetchResult = useCallback(async () => {
+    // Prevent multiple simultaneous fetches
+    if (loading) return;
+    
     setLoading(true);
     clearError();
     
     try {
-      const response = await analysisAPI.getResults(parseInt(fileId));
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), 10000)
+      );
+      
+      const responsePromise = analysisAPI.getResults(parseInt(fileId));
+      const response = await Promise.race([responsePromise, timeoutPromise]);
       console.log('Result response:', response);
       
       // Debug: Log the full response to see what fields are available
@@ -57,7 +65,7 @@ const Results = () => {
     } finally {
       setLoading(false);
     }
-  }, [fileId, clearError, handleError]);
+  }, [fileId, clearError, handleError, loading]);
 
   useEffect(() => {
     if (fileId) {
