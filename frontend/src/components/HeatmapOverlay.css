@@ -1,0 +1,486 @@
+/* HeatmapOverlay.css */
+
+.heatmap-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+  padding: 20px;
+  backdrop-filter: blur(5px);
+}
+
+.heatmap-card {
+  width: 100%;
+  max-width: 1200px;
+  max-height: 90vh;
+  background: white;
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.heatmap-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.header-content h5 {
+  margin: 0;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.header-badges {
+  display: flex;
+  gap: 8px;
+}
+
+.header-badges .badge {
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+.heatmap-body {
+  flex: 1;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  overflow: hidden;
+}
+
+/* Controls */
+.heatmap-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 1px solid #e9ecef;
+}
+
+.control-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.control-group .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.control-group .btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Settings Panel */
+.heatmap-settings {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 1px solid #e9ecef;
+}
+
+.setting-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 200px;
+}
+
+.setting-group label {
+  font-weight: 500;
+  color: #495057;
+  font-size: 14px;
+  min-width: 100px;
+}
+
+.opacity-slider {
+  flex: 1;
+  min-width: 120px;
+}
+
+.setting-value {
+  font-weight: 600;
+  color: #007bff;
+  min-width: 40px;
+  text-align: right;
+}
+
+.color-scheme-select {
+  min-width: 120px;
+  border-radius: 8px;
+  border: 1px solid #ced4da;
+  font-size: 14px;
+}
+
+/* Canvas Container */
+.canvas-container {
+  flex: 1;
+  position: relative;
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.heatmap-canvas {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.heatmap-canvas:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+/* Zoom Indicator */
+.zoom-indicator {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 10;
+}
+
+.zoom-indicator .badge {
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+}
+
+/* Instructions */
+.heatmap-instructions {
+  text-align: center;
+  padding: 10px;
+  background: #e9ecef;
+  border-radius: 8px;
+  border-left: 4px solid #007bff;
+}
+
+.heatmap-instructions small {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .heatmap-overlay {
+    padding: 10px;
+  }
+
+  .heatmap-card {
+    max-height: 95vh;
+  }
+
+  .heatmap-header {
+    padding: 12px 15px;
+  }
+
+  .header-content h5 {
+    font-size: 1rem;
+  }
+
+  .heatmap-body {
+    padding: 15px;
+    gap: 10px;
+  }
+
+  .heatmap-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .control-group {
+    justify-content: center;
+  }
+
+  .heatmap-settings {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 15px;
+  }
+
+  .setting-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .setting-group label {
+    min-width: auto;
+    text-align: center;
+  }
+
+  .canvas-container {
+    min-height: 300px;
+  }
+
+  .zoom-indicator {
+    top: 5px;
+    right: 5px;
+  }
+
+  .zoom-indicator .badge {
+    font-size: 10px;
+    padding: 4px 8px;
+  }
+}
+
+@media (max-width: 576px) {
+  .heatmap-overlay {
+    padding: 5px;
+  }
+
+  .heatmap-card {
+    max-height: 98vh;
+  }
+
+  .heatmap-header {
+    padding: 10px 12px;
+  }
+
+  .header-content h5 {
+    font-size: 0.9rem;
+  }
+
+  .header-badges {
+    flex-wrap: wrap;
+  }
+
+  .heatmap-body {
+    padding: 10px;
+  }
+
+  .control-group .btn {
+    width: 32px;
+    height: 32px;
+    font-size: 12px;
+  }
+
+  .canvas-container {
+    min-height: 250px;
+  }
+}
+
+/* Fullscreen Styles */
+.heatmap-overlay:fullscreen {
+  background: black;
+  padding: 0;
+}
+
+.heatmap-overlay:fullscreen .heatmap-card {
+  max-width: none;
+  max-height: none;
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+}
+
+.heatmap-overlay:fullscreen .canvas-container {
+  flex: 1;
+  min-height: auto;
+}
+
+/* Animation Effects */
+.heatmap-overlay {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.heatmap-card {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Hover Effects */
+.control-group .btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.setting-group:hover {
+  background: #e9ecef;
+  border-radius: 8px;
+  padding: 8px;
+  margin: -8px;
+}
+
+/* Focus States */
+.control-group .btn:focus {
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+}
+
+.color-scheme-select:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .heatmap-overlay,
+  .heatmap-card,
+  .control-group .btn {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .heatmap-card {
+    background: #2c3e50;
+    color: white;
+  }
+
+  .heatmap-controls,
+  .heatmap-settings {
+    background: #34495e;
+    border-color: #495057;
+  }
+
+  .setting-group label {
+    color: #bdc3c7;
+  }
+
+  .canvas-container {
+    background: #34495e;
+    border-color: #495057;
+  }
+
+  .heatmap-instructions {
+    background: #34495e;
+    border-left-color: #007bff;
+  }
+
+  .color-scheme-select {
+    background: #34495e;
+    color: white;
+    border-color: #495057;
+  }
+}
+
+/* Custom Slider Styles */
+.opacity-slider .form-range::-webkit-slider-thumb {
+  background: linear-gradient(135deg, #007bff, #0056b3);
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+}
+
+.opacity-slider .form-range::-webkit-slider-track {
+  background: #e9ecef;
+  border-radius: 4px;
+  height: 8px;
+}
+
+.opacity-slider .form-range::-moz-range-thumb {
+  background: linear-gradient(135deg, #007bff, #0056b3);
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+}
+
+.opacity-slider .form-range::-moz-range-track {
+  background: #e9ecef;
+  border-radius: 4px;
+  height: 8px;
+  border: none;
+}
+
+/* Loading State */
+.heatmap-overlay.loading {
+  pointer-events: none;
+}
+
+.heatmap-overlay.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: translate(-50%, -50%) rotate(0deg); }
+  100% { transform: translate(-50%, -50%) rotate(360deg); }
+} 
