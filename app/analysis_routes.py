@@ -15,7 +15,7 @@ from typing import List, Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 
 from app.database import get_db
 from app.auth import get_current_user
@@ -282,7 +282,7 @@ async def get_analysis_stats(
     # Get average confidence score
     avg_confidence = db.query(DetectionResultModel).join(MediaFile).filter(
         MediaFile.user_id == current_user.id
-    ).with_entities(db.func.avg(DetectionResultModel.confidence_score)).scalar()
+    ).with_entities(func.avg(DetectionResultModel.confidence_score)).scalar()
     
     # Get recent activity (last 7 days)
     week_ago = datetime.utcnow() - timedelta(days=7)

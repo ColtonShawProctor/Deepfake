@@ -10,6 +10,7 @@ import os
 import logging
 import time
 import json
+import numpy as np
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from PIL import Image, UnidentifiedImageError
@@ -27,6 +28,23 @@ from app.models.deepfake_models import (
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def convert_numpy_types(obj):
+    """Convert numpy types to Python types for JSON serialization"""
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    else:
+        return obj
 
 class EnhancedDeepfakeDetector:
     """
@@ -142,9 +160,9 @@ class EnhancedDeepfakeDetector:
                 analysis_time = time.time() - start_time
                 
                 result = {
-                    "confidence_score": detection_result.confidence_score,
-                    "is_deepfake": detection_result.is_deepfake,
-                    "analysis_metadata": analysis_metadata,
+                    "confidence_score": convert_numpy_types(detection_result.confidence_score),
+                    "is_deepfake": convert_numpy_types(detection_result.is_deepfake),
+                    "analysis_metadata": convert_numpy_types(analysis_metadata),
                     "analysis_time": datetime.utcnow().isoformat(),
                     "processing_time_seconds": round(analysis_time, 3),
                     "error": None

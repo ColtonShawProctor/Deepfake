@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fileAPI, analysisAPI, apiUtils } from '../services/api';
+import { fileAPI, analysisAPI } from '../services/api';
 import { useApiError } from '../hooks/useApiError';
 
 const Upload = () => {
@@ -38,12 +38,12 @@ const Upload = () => {
 
     // Check if file is actually an image
     if (!file.type.startsWith('image/')) {
-      errors.type = 'Please select a valid image file';
+      errors.type = ' Please select a valid image file';
     }
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
-  }, []);
+  }, [ALLOWED_EXTENSIONS, ALLOWED_TYPES, MAX_FILE_SIZE]);
 
   const handleFileSelect = useCallback((file) => {
     if (!file) return;

@@ -56,7 +56,7 @@ const Dashboard = () => {
     if (isAuthenticated) {
       fetchDashboardData();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, fetchDashboardData]);
 
   const handleLogout = async () => {
     try {

@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { analysisAPI } from '../services/api';
 import { useApiError } from '../hooks/useApiError';
 
 const Results = () => {
   const { fileId } = useParams();
-  const navigate = useNavigate();
   const { error, handleError, clearError } = useApiError();
   
   const [result, setResult] = useState(null);
@@ -18,7 +17,7 @@ const Results = () => {
     if (fileId) {
       fetchResult();
     }
-  }, [fileId]);
+  }, [fileId, fetchResult]);
 
   const fetchResult = async () => {
     setLoading(true);
