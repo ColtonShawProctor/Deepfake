@@ -58,7 +58,7 @@ const Results = () => {
     } finally {
       setLoading(false);
     }
-  }, [fileId, clearError, handleError]);
+  }, [fileId, clearError, handleError, testFileUrl]);
 
   useEffect(() => {
     if (fileId) {
@@ -226,7 +226,7 @@ const Results = () => {
     return fileUrl;
   };
 
-  const testFileUrl = async (fileUrl) => {
+  const testFileUrl = useCallback(async (fileUrl) => {
     if (!fileUrl) return false;
     
     try {
@@ -244,7 +244,7 @@ const Results = () => {
       console.error('File URL test error:', error);
       return false;
     }
-  };
+  }, []);
 
   if (loading) {
     return (

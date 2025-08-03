@@ -45,17 +45,17 @@ class UploadResponse(BaseModel):
 # Deepfake Detection Schemas
 class DetectionFeatures(BaseModel):
     """Schema for detection features"""
-    face_detection: Dict[str, Any]
-    texture_analysis: Dict[str, Any]
-    color_analysis: Dict[str, Any]
-    edge_detection: Dict[str, Any]
+    face_detection: Optional[Dict[str, Any]] = None
+    texture_analysis: Optional[Dict[str, Any]] = None
+    color_analysis: Optional[Dict[str, Any]] = None
+    edge_detection: Optional[Dict[str, Any]] = None
 
 class ModelPredictions(BaseModel):
     """Schema for model predictions"""
-    face_swap_probability: float
-    style_transfer_probability: float
-    gan_generated_probability: float
-    deepfake_indicators: int
+    face_swap_probability: Optional[float] = None
+    style_transfer_probability: Optional[float] = None
+    gan_generated_probability: Optional[float] = None
+    deepfake_indicators: Optional[int] = None
 
 class ImageProperties(BaseModel):
     """Schema for image properties"""
@@ -70,30 +70,30 @@ class ImageProperties(BaseModel):
 
 class AnalysisParameters(BaseModel):
     """Schema for analysis parameters"""
-    model_version: str
-    analysis_method: str
-    confidence_threshold: float
-    processing_notes: str
+    model_version: Optional[str] = None
+    analysis_method: Optional[str] = None
+    confidence_threshold: Optional[float] = None
+    processing_notes: Optional[str] = None
 
 class ResultSummary(BaseModel):
     """Schema for result summary"""
-    primary_indicator: str
-    secondary_indicators: List[str]
-    recommendation: str
+    primary_indicator: Optional[str] = None
+    secondary_indicators: Optional[List[str]] = None
+    recommendation: Optional[str] = None
 
 class AnalysisMetadata(BaseModel):
     """Schema for analysis metadata"""
-    image_properties: ImageProperties
-    detection_features: DetectionFeatures
-    model_predictions: ModelPredictions
-    analysis_parameters: AnalysisParameters
-    result_summary: ResultSummary
+    image_properties: Optional[ImageProperties] = None
+    detection_features: Optional[DetectionFeatures] = None
+    model_predictions: Optional[ModelPredictions] = None
+    analysis_parameters: Optional[AnalysisParameters] = None
+    result_summary: Optional[ResultSummary] = None
 
 class DetectionResult(BaseModel):
     """Schema for deepfake detection result"""
     confidence_score: float
     is_deepfake: bool
-    analysis_metadata: AnalysisMetadata
+    analysis_metadata: Optional[AnalysisMetadata] = None
     analysis_time: str
     processing_time_seconds: float
     error: Optional[str] = None
