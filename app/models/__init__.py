@@ -17,6 +17,10 @@ from .xception_trainer import XceptionTrainer, DeepfakeDataset
 from .efficientnet_detector import EfficientNetDetector, EfficientNetB4, EfficientNetPreprocessor
 from .efficientnet_trainer import EfficientNetTrainer, EfficientNetDataset
 
+# F3Net detector components
+from .f3net_detector import F3NetDetector, F3Net, F3NetPreprocessor, DCT2D, FrequencyAttention, FrequencyFilter
+from .f3net_trainer import F3NetTrainer, F3NetDataset as F3NetDatasetClass
+
 __all__ = [
     # Database models
     'User',
@@ -66,5 +70,15 @@ __all__ = [
     'EfficientNetB4',
     'EfficientNetPreprocessor',
     'EfficientNetTrainer',
-    'EfficientNetDataset'
+    'EfficientNetDataset',
+    
+    # F3Net detector
+    'F3NetDetector',
+    'F3Net',
+    'F3NetPreprocessor',
+    'DCT2D',
+    'FrequencyAttention',
+    'FrequencyFilter',
+    'F3NetTrainer',
+    'F3NetDatasetClass'
 ]
