@@ -13,6 +13,8 @@ const Results = () => {
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [message, setMessage] = useState('');
 
+
+
   const fetchResult = useCallback(async () => {
     setLoading(true);
     clearError();
@@ -45,11 +47,8 @@ const Results = () => {
       
       console.log('Transformed result:', transformedResult);
       
-      // Test if the file URL is accessible
-      if (transformedResult.fileUrl) {
-        const isAccessible = await testFileUrl(transformedResult.fileUrl);
-        console.log('File URL accessible:', isAccessible);
-      }
+      // Note: File URL testing removed to prevent infinite loops
+      // File URLs are constructed but not tested for accessibility
       
       setResult(transformedResult);
     } catch (err) {
@@ -58,7 +57,7 @@ const Results = () => {
     } finally {
       setLoading(false);
     }
-  }, [fileId, clearError, handleError, testFileUrl]);
+  }, [fileId, clearError, handleError]);
 
   useEffect(() => {
     if (fileId) {
@@ -225,26 +224,6 @@ const Results = () => {
     }
     return fileUrl;
   };
-
-  const testFileUrl = useCallback(async (fileUrl) => {
-    if (!fileUrl) return false;
-    
-    try {
-      const fullUrl = getFullFileUrl(fileUrl);
-      console.log('Testing file URL:', fullUrl);
-      
-      const response = await fetch(fullUrl, {
-        method: 'HEAD',
-        credentials: 'include', // Include cookies for authentication
-      });
-      
-      console.log('File URL test response:', response.status, response.statusText);
-      return response.ok;
-    } catch (error) {
-      console.error('File URL test error:', error);
-      return false;
-    }
-  }, []);
 
   if (loading) {
     return (
