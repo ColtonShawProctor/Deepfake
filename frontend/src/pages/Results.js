@@ -12,7 +12,7 @@ const Results = () => {
   const [retryLoading, setRetryLoading] = useState(false);
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [loadingMessage, setLoadingMessage] = useState('Loading Analysis Results...');
+  const [loadingMessage] = useState('Loading Analysis Results...');
   
   // Use ref to track if we've already fetched for this fileId
   const hasFetchedRef = useRef(false);
@@ -80,7 +80,7 @@ const Results = () => {
     } finally {
       setLoading(false);
     }
-  }, [fileId, clearError, handleError, loading]);
+  }, [fileId, clearError, handleError]); // Remove loading from dependencies to prevent recreation
 
   useEffect(() => {
     if (fileId) {
@@ -91,7 +91,7 @@ const Results = () => {
       }
       fetchResult();
     }
-  }, [fileId]); // Remove fetchResult from dependencies to prevent infinite loops
+  }, [fileId, fetchResult]); // Add fetchResult back but with stable dependencies
 
   const handleRetryAnalysis = async () => {
     setRetryLoading(true);
