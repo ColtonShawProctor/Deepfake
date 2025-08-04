@@ -7,6 +7,7 @@ import '@fortawesome/fontawesome-free/css/all.min.css';
 // Components
 import { AuthProvider } from './components/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import ErrorBoundary from './components/ErrorBoundary';
 import Navbar from './components/Navbar';
 import Login from './components/Login';
 import Register from './components/Register';
@@ -20,12 +21,13 @@ import Results from './pages/Results';
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <div className="App">
-          <Navbar />
-          <main>
-            <Routes>
+    <ErrorBoundary>
+      <AuthProvider>
+        <Router>
+          <div className="App">
+            <Navbar />
+            <main>
+              <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
@@ -67,6 +69,7 @@ function App() {
         </div>
       </Router>
     </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -130,13 +130,19 @@ const Upload = () => {
       setUploading(false);
       setAnalyzing(true);
 
-      // Start analysis
-      await analysisAPI.analyzeFile(uploadResponse.file_id);
+      // Start analysis and wait for completion
+      const analysisResponse = await analysisAPI.analyzeFile(uploadResponse.file_id);
       
-      // Redirect to results page after successful analysis
-      setTimeout(() => {
+      // Check if analysis is complete
+      if (analysisResponse && analysisResponse.success) {
+        // Analysis is complete, redirect immediately
         navigate(`/results/${uploadResponse.file_id}`);
-      }, 2000);
+      } else {
+        // If analysis response doesn't confirm completion, wait a bit
+        setTimeout(() => {
+          navigate(`/results/${uploadResponse.file_id}`);
+        }, 1000);
+      }
 
     } catch (err) {
       handleError(err);

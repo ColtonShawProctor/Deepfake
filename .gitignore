@@ -21,36 +21,51 @@ wheels/
 *.egg
 MANIFEST
 
-# Virtual environments
-venv/
+# PyTorch model files (large)
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+
+# Training data and datasets
+training_data/
+improved_training_data/
+datasets/
+test_samples/
+*.jpg
+*.jpeg
+*.png
+*.mp4
+*.avi
+*.mov
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs and reports
+*.log
+*_test_report.txt
+*_test_results.json
+
+# Environment files
+.env
+.venv
 env/
+venv/
 ENV/
 env.bak/
 venv.bak/
 
-# Database files
-*.db
-*.db-shm
-*.db-wal
-*.sqlite
-*.sqlite3
-
-# Uploads and backups
-uploads/
-backups/
-
-# Test files
-test_*.py
-*_test.py
-
-# IDE
+# IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS
+# OS files
 .DS_Store
 .DS_Store?
 ._*
@@ -59,15 +74,26 @@ test_*.py
 ehthumbs.db
 Thumbs.db
 
-# Logs
-*.log
-logs/
+# Jupyter Notebook
+.ipynb_checkpoints
 
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# pyenv
+.python-version
+
+# Backup files
+backups/
+*.bak
+*.backup
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Large test images
+large_test_image.jpg
+
+# Embedded git repositories
+datasets/*/repo/
 
 

@@ -1,18 +1,18 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { apiUtils } from '../services/api';
 
 export const useApiError = () => {
   const [error, setError] = useState('');
 
-  const handleError = (err) => {
+  const handleError = useCallback((err) => {
     const errorMessage = apiUtils.handleError(err);
     setError(errorMessage);
     return errorMessage;
-  };
+  }, []);
 
-  const clearError = () => {
+  const clearError = useCallback(() => {
     setError('');
-  };
+  }, []);
 
   return {
     error,

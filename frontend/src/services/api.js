@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getApiConfig } from '../config/api';
+import requestThrottle from '../utils/requestThrottle';
 
 // Get API configuration
 const config = getApiConfig() || {
@@ -222,12 +223,16 @@ export const fileAPI = {
 export const analysisAPI = {
   // Analyze file
   analyzeFile: async (fileId, options = {}) => {
-    try {
-      const response = await api.post(`/api/analysis/analyze/${fileId}`, options);
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
+    const requestKey = `analyzeFile-${fileId}`;
+    
+    return requestThrottle.throttle(requestKey, async () => {
+      try {
+        const response = await api.post(`/api/detection/analyze/${fileId}`, options);
+        return response.data;
+      } catch (error) {
+        throw error;
+      }
+    });
   },
 
   // Get analysis status
@@ -242,12 +247,16 @@ export const analysisAPI = {
 
   // Get analysis results
   getResults: async (fileId) => {
-    try {
-      const response = await api.get(`/api/analysis/results/${fileId}`);
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
+    const requestKey = `getResults-${fileId}`;
+    
+    return requestThrottle.throttle(requestKey, async () => {
+      try {
+        const response = await api.get(`/api/detection/results/${fileId}`);
+        return response.data;
+      } catch (error) {
+        throw error;
+      }
+    });
   },
 
   // Get all user's analysis results

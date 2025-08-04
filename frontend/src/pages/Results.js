@@ -19,8 +19,8 @@ const Results = () => {
   const currentFileIdRef = useRef(null);
 
   const fetchResult = useCallback(async () => {
-    // Prevent multiple simultaneous fetches and duplicate fetches for same fileId
-    if (loading || (hasFetchedRef.current && currentFileIdRef.current === fileId)) {
+    // Prevent duplicate fetches for same fileId (but allow initial fetch even when loading)
+    if (hasFetchedRef.current && currentFileIdRef.current === fileId) {
       return;
     }
     

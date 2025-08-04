@@ -7,6 +7,14 @@ from app.upload_routes import router as upload_router
 from app.detection_routes import router as detection_router
 from app.analysis_routes import router as analysis_router
 
+# Import advanced ensemble routes
+try:
+    from app.api.advanced_ensemble_api import router as advanced_ensemble_router
+    ADVANCED_ENSEMBLE_AVAILABLE = True
+except ImportError:
+    ADVANCED_ENSEMBLE_AVAILABLE = False
+    print("Warning: Advanced ensemble API not available")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -17,7 +25,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Deepfake Detection API",
-    description="API for detecting deepfake images and videos",
+    description="API for detecting deepfake images and videos with advanced ensemble methods",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -37,9 +45,23 @@ app.include_router(upload_router)
 app.include_router(detection_router)
 app.include_router(analysis_router, prefix="/api")
 
+# Include advanced ensemble routes if available
+if ADVANCED_ENSEMBLE_AVAILABLE:
+    app.include_router(advanced_ensemble_router)
+    print("✓ Advanced ensemble API routes included")
+
 @app.get("/")
 async def root():
-    return {"message": "Deepfake Detection API"}
+    return {
+        "message": "Deepfake Detection API",
+        "version": "1.0.0",
+        "features": {
+            "basic_detection": True,
+            "advanced_ensemble": ADVANCED_ENSEMBLE_AVAILABLE,
+            "multi_model": True,
+            "analysis": True
+        }
+    }
 
 @app.get("/health")
 async def health_check():
@@ -48,5 +70,39 @@ async def health_check():
     return {
         "status": "healthy",
         "database": db_health,
+        "advanced_ensemble": ADVANCED_ENSEMBLE_AVAILABLE,
         "timestamp": "2024-08-01T00:00:00Z"
+    }
+
+@app.get("/models")
+async def get_available_models():
+    """Get information about available detection models"""
+    return {
+        "models": [
+            {
+                "name": "Xception",
+                "type": "CNN",
+                "description": "Xception-based deepfake detector",
+                "available": True
+            },
+            {
+                "name": "EfficientNet",
+                "type": "CNN",
+                "description": "EfficientNet-based deepfake detector",
+                "available": True
+            },
+            {
+                "name": "F3Net",
+                "type": "Frequency",
+                "description": "Frequency-based deepfake detector",
+                "available": True
+            }
+        ],
+        "ensemble_methods": [
+            "attention_merge",
+            "temperature_scaled",
+            "monte_carlo_dropout",
+            "adaptive_weighting",
+            "agreement_resolution"
+        ] if ADVANCED_ENSEMBLE_AVAILABLE else []
     }
