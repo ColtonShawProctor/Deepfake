@@ -119,3 +119,70 @@ class DetectorInfo(BaseModel):
     supported_formats: List[str]
     max_file_size_mb: int
     confidence_threshold: float
+
+# Video Analysis Schemas
+class VideoMetadata(BaseModel):
+    """Schema for video metadata"""
+    fps: float
+    frame_count: int
+    duration: float
+    width: int
+    height: int
+    codec: Optional[str] = None
+    bitrate: Optional[int] = None
+
+class FrameAnalysis(BaseModel):
+    """Schema for individual frame analysis"""
+    frame_number: int
+    timestamp: float
+    confidence_score: float
+    is_deepfake: bool
+    processing_time: float
+    analysis_metadata: Optional[Dict[str, Any]] = None
+
+class TemporalAnalysis(BaseModel):
+    """Schema for temporal analysis results"""
+    temporal_consistency: float
+    consistency_score: float
+    temporal_patterns: List[Dict[str, Any]]
+    anomaly_frames: List[int]
+    confidence_variance: float
+    confidence_trend: float
+
+class VideoAnalysisResults(BaseModel):
+    """Schema for video analysis results"""
+    overall_confidence: float
+    is_deepfake: bool
+    temporal_consistency: float
+    frame_analyses: List[FrameAnalysis]
+    temporal_analysis: TemporalAnalysis
+    processing_config: Dict[str, Any]
+
+class VideoUploadResponse(BaseModel):
+    """Schema for video upload response"""
+    success: bool
+    message: str
+    file_id: int
+    task_id: str
+    filename: str
+    video_metadata: VideoMetadata
+
+class VideoProgressResponse(BaseModel):
+    """Schema for video processing progress"""
+    task_id: str
+    status: str
+    progress_percent: float
+    processed_frames: int
+    total_frames: int
+    elapsed_time: float
+    estimated_remaining: float
+    frames_per_second: float
+
+class VideoAnalysisResponse(BaseModel):
+    """Schema for video analysis response"""
+    success: bool
+    file_id: int
+    filename: str
+    video_metadata: VideoMetadata
+    analysis_results: VideoAnalysisResults
+    created_at: datetime

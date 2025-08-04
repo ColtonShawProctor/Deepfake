@@ -6,6 +6,7 @@ from app.auth_routes import router as auth_router
 from app.upload_routes import router as upload_router
 from app.detection_routes import router as detection_router
 from app.analysis_routes import router as analysis_router
+from app.video_routes import router as video_router
 
 # Import advanced ensemble routes
 try:
@@ -44,6 +45,7 @@ app.include_router(auth_router)
 app.include_router(upload_router)
 app.include_router(detection_router)
 app.include_router(analysis_router, prefix="/api")
+app.include_router(video_router)
 
 # Include advanced ensemble routes if available
 if ADVANCED_ENSEMBLE_AVAILABLE:
@@ -59,7 +61,8 @@ async def root():
             "basic_detection": True,
             "advanced_ensemble": ADVANCED_ENSEMBLE_AVAILABLE,
             "multi_model": True,
-            "analysis": True
+            "analysis": True,
+            "video_analysis": True
         }
     }
 
