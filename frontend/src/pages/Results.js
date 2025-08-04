@@ -12,6 +12,7 @@ const Results = () => {
   const [retryLoading, setRetryLoading] = useState(false);
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [loadingMessage, setLoadingMessage] = useState('Loading Analysis Results...');
   
   // Use ref to track if we've already fetched for this fileId
   const hasFetchedRef = useRef(false);
@@ -31,13 +32,18 @@ const Results = () => {
     currentFileIdRef.current = fileId;
     
     try {
-      // Add timeout to prevent hanging
+      // Simple single request with timeout
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Request timeout')), 10000)
       );
       
       const responsePromise = analysisAPI.getResults(parseInt(fileId));
       const response = await Promise.race([responsePromise, timeoutPromise]);
+      
+      if (!response || !response.detection_result) {
+        throw new Error('Invalid response format');
+      }
+      
       console.log('Result response:', response);
       
       // Debug: Log the full response to see what fields are available
@@ -85,7 +91,7 @@ const Results = () => {
       }
       fetchResult();
     }
-  }, [fileId, fetchResult]);
+  }, [fileId]); // Remove fetchResult from dependencies to prevent infinite loops
 
   const handleRetryAnalysis = async () => {
     setRetryLoading(true);
@@ -260,8 +266,8 @@ const Results = () => {
                 <div className="spinner-border text-primary mb-3" role="status">
                   <span className="visually-hidden">Loading...</span>
                 </div>
-                <h5>Loading Analysis Results...</h5>
-                <p className="text-muted">Please wait while we fetch the analysis data</p>
+                <h5>{loadingMessage}</h5>
+                <p className="text-muted">Please wait while we process your file</p>
               </div>
             </div>
           </div>
