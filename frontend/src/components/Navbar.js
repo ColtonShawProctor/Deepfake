@@ -43,7 +43,12 @@ const Navbar = () => {
                 </li>
                 <li className="nav-item">
                   <Link className="nav-link" to="/upload">
-                    Upload
+                    Upload Image
+                  </Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/video-upload">
+                    Upload Video
                   </Link>
                 </li>
                 <li className="nav-item">

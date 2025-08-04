@@ -18,6 +18,7 @@ import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Upload from './pages/Upload';
 import Results from './pages/Results';
+import VideoUploadPage from './pages/VideoUpload';
 
 function App() {
   return (
@@ -61,6 +62,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <Results />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/video-upload" 
+                element={
+                  <ProtectedRoute>
+                    <VideoUploadPage />
                   </ProtectedRoute>
                 } 
               />

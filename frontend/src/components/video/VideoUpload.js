@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, Video, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { getApiConfig } from '../../config/api';
 import './VideoUpload.css';
 
 const VideoUpload = ({ onUploadComplete, onProgressUpdate }) => {
@@ -13,10 +14,30 @@ const VideoUpload = ({ onUploadComplete, onProgressUpdate }) => {
     const file = acceptedFiles[0];
     if (!file) return;
 
-    // Validate file type
-    const allowedTypes = ['video/mp4', 'video/avi', 'video/mov', 'video/mkv', 'video/wmv', 'video/flv'];
-    if (!allowedTypes.includes(file.type)) {
-      setError('Unsupported file type. Please upload MP4, AVI, MOV, MKV, WMV, or FLV files.');
+    // Debug: Log file information
+    console.log('File upload attempt:', {
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      lastModified: file.lastModified
+    });
+
+    // Validate file type - more flexible validation
+    const allowedTypes = [
+      'video/mp4', 'video/avi', 'video/mov', 'video/mkv', 'video/wmv', 'video/flv',
+      'video/x-msvideo', 'video/quicktime', 'video/x-matroska', 'video/x-ms-wmv'
+    ];
+    const allowedExtensions = ['.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv'];
+    
+    // Check MIME type first
+    const isValidMimeType = allowedTypes.includes(file.type);
+    
+    // If MIME type check fails, check file extension
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    const isValidExtension = allowedExtensions.includes(fileExtension);
+    
+    if (!isValidMimeType && !isValidExtension) {
+      setError(`Unsupported file type: ${file.type || fileExtension}. Please upload MP4, AVI, MOV, MKV, WMV, or FLV files.`);
       return;
     }
 
@@ -37,13 +58,16 @@ const VideoUpload = ({ onUploadComplete, onProgressUpdate }) => {
       formData.append('video_file', file);
 
       // Get auth token
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('token');
       if (!token) {
         throw new Error('Authentication required');
       }
 
+      // Get API configuration
+      const apiConfig = getApiConfig();
+      
       // Upload video
-      const uploadResponse = await fetch('/api/video/upload', {
+      const uploadResponse = await fetch(`${apiConfig.BASE_URL}/api/video/upload`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -73,11 +97,12 @@ const VideoUpload = ({ onUploadComplete, onProgressUpdate }) => {
   }, [onUploadComplete]);
 
   const pollProgress = async (taskId) => {
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('token');
+    const apiConfig = getApiConfig();
     
     const pollInterval = setInterval(async () => {
       try {
-        const response = await fetch(`/api/video/progress/${taskId}`, {
+        const response = await fetch(`${apiConfig.BASE_URL}/api/video/progress/${taskId}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -111,7 +136,13 @@ const VideoUpload = ({ onUploadComplete, onProgressUpdate }) => {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'video/*': ['.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv']
+      'video/*': ['.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv'],
+      'video/mp4': ['.mp4'],
+      'video/avi': ['.avi'],
+      'video/quicktime': ['.mov'],
+      'video/x-matroska': ['.mkv'],
+      'video/x-ms-wmv': ['.wmv'],
+      'video/x-flv': ['.flv']
     },
     multiple: false,
     disabled: uploading
