@@ -97,3 +97,9 @@ large_test_image.jpg
 datasets/*/repo/
 
 
+# Docker and deployment sensitive files
+deployment/nginx/ssl/
+.env
+*.pem
+__pycache__/
+*.pyc

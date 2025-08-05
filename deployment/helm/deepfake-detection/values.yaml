@@ -1,0 +1,428 @@
+# Default values for deepfake-detection Helm chart
+# Production-ready configuration with auto-scaling and monitoring
+
+# Global settings
+global:
+  environment: production
+  image:
+    registry: 123456789.dkr.ecr.us-east-1.amazonaws.com
+    pullPolicy: IfNotPresent
+    tag: latest
+  
+  # Security
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+  
+  # Resource management
+  resources:
+    api:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 4000m
+        memory: 8Gi
+    
+    modelServer:
+      requests:
+        cpu: 2000m
+        memory: 8Gi
+        nvidia.com/gpu: 1
+      limits:
+        cpu: 16000m
+        memory: 64Gi
+        nvidia.com/gpu: 1
+
+# API Server configuration
+api:
+  replicaCount: 3
+  
+  image:
+    repository: deepfake-detection-api
+    tag: v1.0.0
+  
+  service:
+    type: LoadBalancer
+    port: 80
+    targetPort: 8000
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+      service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+  
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/rate-limit: "100"
+      nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    hosts:
+      - host: api.deepfake-detection.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: api-tls
+        hosts:
+          - api.deepfake-detection.com
+  
+  # Auto-scaling
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 75
+    behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+      scaleUp:
+        stabilizationWindowSeconds: 60
+        policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+        - type: Pods
+          value: 4
+          periodSeconds: 60
+  
+  # Health checks
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 8000
+    initialDelaySeconds: 15
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+  
+  # Environment variables
+  env:
+    - name: DATABASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: database-credentials
+          key: url
+    - name: REDIS_URL
+      valueFrom:
+        secretKeyRef:
+          name: redis-credentials
+          key: url
+    - name: MODEL_SERVER_URL
+      value: "http://model-server-service:8000"
+    - name: ENABLE_RATE_LIMITING
+      value: "true"
+    - name: RATE_LIMIT_PER_MINUTE
+      value: "60"
+    - name: MAX_FILE_SIZE_MB
+      value: "100"
+    - name: LOG_LEVEL
+      value: "INFO"
+    - name: WORKERS
+      value: "4"
+
+# Model Server configuration (Triton)
+modelServer:
+  replicaCount: 2
+  
+  image:
+    repository: nvcr.io/nvidia/tritonserver
+    tag: 23.10-py3
+  
+  service:
+    type: ClusterIP
+    ports:
+      http: 8000
+      grpc: 8001
+      metrics: 8002
+  
+  # Model repository
+  modelRepository:
+    s3:
+      enabled: true
+      bucket: deepfake-detection-models
+      region: us-east-1
+      prefix: production
+  
+  # GPU configuration
+  gpu:
+    enabled: true
+    type: nvidia-tesla-t4
+    count: 1
+  
+  # Auto-scaling based on GPU metrics
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 10
+    metrics:
+    - type: Resource
+      resource:
+        name: nvidia.com/gpu
+        target:
+          type: Utilization
+          averageUtilization: 80
+    - type: Pods
+      pods:
+        metric:
+          name: triton_request_rate
+        target:
+          type: AverageValue
+          averageValue: "1000"
+  
+  # Triton configuration
+  config:
+    maxBatchSize: 8
+    dynamicBatching:
+      maxQueueDelayMicroseconds: 100000
+      preferredBatchSize: [4, 8]
+    instanceGroup:
+      - count: 1
+        kind: KIND_GPU
+        gpus: [0]
+    optimization:
+      cudaGraphs: true
+      tensorRTOptimization: true
+      mixedPrecision: true
+
+# Redis cache configuration
+redis:
+  enabled: true
+  architecture: replication
+  auth:
+    enabled: true
+    existingSecret: redis-credentials
+  
+  master:
+    count: 1
+    persistence:
+      enabled: true
+      size: 50Gi
+      storageClass: gp3
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 16Gi
+  
+  replica:
+    replicaCount: 2
+    persistence:
+      enabled: true
+      size: 50Gi
+    resources:
+      requests:
+        cpu: 250m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 8Gi
+  
+  sentinel:
+    enabled: true
+    quorum: 2
+
+# PostgreSQL configuration (using external RDS)
+postgresql:
+  enabled: false  # Using external RDS Aurora
+  
+  # Connection pooling with PgBouncer
+  pgbouncer:
+    enabled: true
+    replicaCount: 2
+    config:
+      databases:
+        deepfake_detection:
+          host: deepfake-detection-db.cluster-xxxxx.us-east-1.rds.amazonaws.com
+          port: 5432
+          pool_size: 25
+          max_db_connections: 100
+      pgbouncer:
+        pool_mode: transaction
+        max_client_conn: 1000
+        default_pool_size: 25
+        min_pool_size: 10
+        server_lifetime: 3600
+
+# Monitoring stack
+monitoring:
+  enabled: true
+  
+  prometheus:
+    enabled: true
+    retention: 30d
+    storageSize: 100Gi
+    serviceMonitor:
+      enabled: true
+      interval: 15s
+      scrapeTimeout: 10s
+    
+    # Custom recording rules
+    recordingRules:
+      - name: deepfake_detection_rules
+        rules:
+        - record: inference_request_rate
+          expr: rate(http_requests_total{job="api-server",handler="/api/analyze"}[5m])
+        - record: gpu_utilization_avg
+          expr: avg(nvidia_gpu_utilization{job="model-server"})
+        - record: detection_rate
+          expr: rate(deepfake_detections_total[5m])
+  
+  grafana:
+    enabled: true
+    adminPassword: changeme
+    persistence:
+      enabled: true
+      size: 10Gi
+    
+    dashboardProviders:
+      dashboardproviders.yaml:
+        apiVersion: 1
+        providers:
+        - name: 'default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+    
+    dashboards:
+      default:
+        deepfake-detection:
+          url: https://raw.githubusercontent.com/deepfake-detection/dashboards/main/production.json
+  
+  # Distributed tracing
+  jaeger:
+    enabled: true
+    storage:
+      type: elasticsearch
+      elasticsearch:
+        host: elasticsearch:9200
+    
+    collector:
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+    
+    query:
+      enabled: true
+      ingress:
+        enabled: true
+        hosts:
+          - tracing.deepfake-detection.com
+
+# Security policies
+networkPolicies:
+  enabled: true
+  
+  # API server can only talk to model server and databases
+  apiServer:
+    ingress:
+      - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+        ports:
+        - protocol: TCP
+          port: 8000
+    egress:
+      - to:
+        - podSelector:
+            matchLabels:
+              app: model-server
+        ports:
+        - protocol: TCP
+          port: 8000
+      - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+        ports:
+        - protocol: TCP
+          port: 6379
+      - to:
+        - namespaceSelector: {}
+        ports:
+        - protocol: TCP
+          port: 5432  # PostgreSQL
+      - to:
+        - namespaceSelector: {}
+        ports:
+        - protocol: TCP
+          port: 53   # DNS
+        - protocol: UDP
+          port: 53
+
+# Pod disruption budgets
+podDisruptionBudgets:
+  api:
+    minAvailable: 2
+  modelServer:
+    minAvailable: 1
+  redis:
+    minAvailable: 1
+
+# Resource quotas per namespace
+resourceQuota:
+  enabled: true
+  hard:
+    requests.cpu: "100"
+    requests.memory: "500Gi"
+    requests.nvidia.com/gpu: "20"
+    persistentvolumeclaims: "20"
+    services.loadbalancers: "5"
+
+# Cost optimization
+costOptimization:
+  # Use spot instances for non-GPU nodes
+  spotInstances:
+    enabled: true
+    nodeSelector:
+      node.kubernetes.io/lifecycle: spot
+    tolerations:
+    - key: "spot"
+      operator: "Equal"
+      value: "true"
+      effect: "NoSchedule"
+  
+  # Vertical pod autoscaling
+  vpa:
+    enabled: true
+    updateMode: "Auto"
+    
+  # Cluster autoscaler configuration
+  clusterAutoscaler:
+    enabled: true
+    image:
+      tag: v1.28.0
+    autoDiscovery:
+      clusterName: deepfake-detection-cluster
+    awsRegion: us-east-1
+    extraArgs:
+      balance-similar-node-groups: true
+      skip-nodes-with-system-pods: false
+      scale-down-delay-after-add: 10m
+      scale-down-unneeded-time: 10m

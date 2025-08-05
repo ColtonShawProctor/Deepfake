@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MP4 Upload Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+        }
+        .upload-area:hover {
+            border-color: #4299e1;
+            background-color: #f7fafc;
+        }
+        .upload-area.dragover {
+            border-color: #4299e1;
+            background-color: #ebf8ff;
+        }
+        .file-info {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f7fafc;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        .error {
+            color: #e53e3e;
+            background-color: #fed7d7;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #38a169;
+            background-color: #f0fff4;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>MP4 Upload Test</h1>
+    <p>This page tests the improved MP4 file validation logic.</p>
+    
+    <div class="upload-area" id="uploadArea">
+        <h3>Drop MP4 file here or click to select</h3>
+        <p>Supports: MP4, AVI, MOV, MKV, WMV, FLV</p>
+        <input type="file" id="fileInput" accept="video/*" style="display: none;">
+    </div>
+    
+    <div id="fileInfo" class="file-info" style="display: none;">
+        <h4>File Information:</h4>
+        <div id="fileDetails"></div>
+    </div>
+    
+    <div id="message"></div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileDetails = document.getElementById('fileDetails');
+        const message = document.getElementById('message');
+
+        // Improved file validation logic (same as in VideoUpload.js)
+        function validateFile(file) {
+            const allowedTypes = [
+                'video/mp4', 'video/avi', 'video/mov', 'video/mkv', 'video/wmv', 'video/flv',
+                'video/x-msvideo', 'video/quicktime', 'video/x-matroska', 'video/x-ms-wmv'
+            ];
+            const allowedExtensions = ['.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv'];
+            
+            // Check MIME type first
+            const isValidMimeType = allowedTypes.includes(file.type);
+            
+            // If MIME type check fails, check file extension
+            const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+            const isValidExtension = allowedExtensions.includes(fileExtension);
+            
+            return {
+                isValid: isValidMimeType || isValidExtension,
+                mimeType: file.type,
+                extension: fileExtension,
+                isValidMimeType,
+                isValidExtension
+            };
+        }
+
+        function displayFileInfo(file, validation) {
+            fileDetails.innerHTML = `
+                <p><strong>Name:</strong> ${file.name}</p>
+                <p><strong>Size:</strong> ${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                <p><strong>Type:</strong> ${file.type || 'Unknown'}</p>
+                <p><strong>Extension:</strong> ${validation.extension}</p>
+                <p><strong>MIME Type Valid:</strong> ${validation.isValidMimeType ? '✅ Yes' : '❌ No'}</p>
+                <p><strong>Extension Valid:</strong> ${validation.isValidExtension ? '✅ Yes' : '❌ No'}</p>
+                <p><strong>Overall Valid:</strong> ${validation.isValid ? '✅ Yes' : '❌ No'}</p>
+            `;
+            fileInfo.style.display = 'block';
+        }
+
+        function handleFile(file) {
+            console.log('File upload attempt:', {
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                lastModified: file.lastModified
+            });
+
+            const validation = validateFile(file);
+            
+            if (validation.isValid) {
+                message.innerHTML = '<div class="success">✅ File is valid and would be accepted!</div>';
+                displayFileInfo(file, validation);
+            } else {
+                message.innerHTML = `<div class="error">❌ File rejected: ${file.type || validation.extension}. Please upload MP4, AVI, MOV, MKV, WMV, or FLV files.</div>`;
+                displayFileInfo(file, validation);
+            }
+        }
+
+        // Click to select file
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // File input change
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        });
+
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+    </script>
+</body>
+</html> 

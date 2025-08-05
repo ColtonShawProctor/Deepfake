@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: deepfake-config
+  namespace: deepfake-detection
+data:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  MAX_WORKERS: "4"
+  MODEL_CACHE_SIZE: "1000"
+  REDIS_URL: "redis://deepfake-redis:6379/0"
+  DATABASE_URL: "postgresql://deepfake_user:$(DB_PASSWORD)@deepfake-postgres:5432/deepfake_db"
+  CORS_ORIGINS: "https://yourdomain.com,https://www.yourdomain.com"
+  RATE_LIMIT_PER_MINUTE: "100"
+  MAX_FILE_SIZE: "100MB"
+  MODEL_LOAD_TIMEOUT: "300"
+  HEALTH_CHECK_INTERVAL: "30" 

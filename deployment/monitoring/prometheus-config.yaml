@@ -1,0 +1,380 @@
+# Prometheus configuration for deepfake detection system monitoring
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: 'deepfake-detection-prod'
+        environment: 'production'
+    
+    # Alerting configuration
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets: ['alertmanager:9093']
+    
+    # Rule files
+    rule_files:
+      - '/etc/prometheus/rules/*.yml'
+    
+    # Scrape configurations
+    scrape_configs:
+      # Kubernetes API server
+      - job_name: 'kubernetes-apiservers'
+        kubernetes_sd_configs:
+          - role: endpoints
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: default;kubernetes;https
+      
+      # Node metrics
+      - job_name: 'kubernetes-nodes'
+        kubernetes_sd_configs:
+          - role: node
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+      
+      # Pod metrics
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name
+      
+      # NVIDIA GPU metrics
+      - job_name: 'nvidia-gpu-metrics'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: model-server
+          - source_labels: [__meta_kubernetes_pod_container_port_number]
+            action: keep
+            regex: '9400'  # NVIDIA DCGM exporter port
+        metric_relabel_configs:
+          - source_labels: [__name__]
+            regex: 'DCGM_.*'
+            target_label: __tmp_prometheus_job_name
+      
+      # Triton Inference Server metrics
+      - job_name: 'triton-metrics'
+        kubernetes_sd_configs:
+          - role: service
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_label_app]
+            action: keep
+            regex: model-server
+          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name]
+            action: replace
+            target_label: job
+            separator: /
+          - source_labels: [__meta_kubernetes_service_name]
+            action: replace
+            target_label: kubernetes_name
+          - source_labels: [__address__]
+            action: replace
+            regex: ([^:]+)(?::\d+)?
+            replacement: $1:8002  # Triton metrics port
+            target_label: __address__
+      
+      # Application metrics
+      - job_name: 'deepfake-api'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: api-server
+          - source_labels: [__meta_kubernetes_pod_container_port_name]
+            action: keep
+            regex: metrics
+      
+      # Redis metrics
+      - job_name: 'redis'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: redis
+          - source_labels: [__meta_kubernetes_pod_container_port_number]
+            action: keep
+            regex: '9121'  # Redis exporter port
+      
+      # PostgreSQL metrics
+      - job_name: 'postgresql'
+        static_configs:
+          - targets: ['postgres-exporter:9187']
+        metrics_path: /metrics
+        params:
+          target: ['deepfake-detection-db.cluster-xxxxx.us-east-1.rds.amazonaws.com:5432']
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: monitoring
+data:
+  deepfake-detection-rules.yml: |
+    groups:
+      - name: deepfake_detection.rules
+        interval: 30s
+        rules:
+          # Request rate
+          - record: instance:deepfake_request_rate
+            expr: |
+              sum(rate(http_requests_total{job="deepfake-api"}[5m])) by (instance)
+          
+          # Error rate
+          - record: instance:deepfake_error_rate
+            expr: |
+              sum(rate(http_requests_total{job="deepfake-api",status=~"5.."}[5m])) by (instance)
+          
+          # GPU utilization
+          - record: instance:gpu_utilization
+            expr: |
+              avg(DCGM_FI_DEV_GPU_UTIL{job="nvidia-gpu-metrics"}) by (instance, gpu)
+          
+          # Model inference latency
+          - record: model:inference_latency:p95
+            expr: |
+              histogram_quantile(0.95, 
+                sum(rate(nv_inference_request_duration_us_bucket{job="triton-metrics"}[5m])) by (model, le)
+              ) / 1000
+          
+          # Detection rate
+          - record: deepfake:detection_rate
+            expr: |
+              sum(rate(deepfake_detections_total{result="positive"}[5m])) / 
+              sum(rate(deepfake_detections_total[5m]))
+      
+      - name: deepfake_detection.alerts
+        rules:
+          # High error rate
+          - alert: HighErrorRate
+            expr: |
+              (sum(rate(http_requests_total{job="deepfake-api",status=~"5.."}[5m])) by (instance) /
+               sum(rate(http_requests_total{job="deepfake-api"}[5m])) by (instance)) > 0.05
+            for: 5m
+            labels:
+              severity: critical
+              team: platform
+            annotations:
+              summary: "High error rate on {{ $labels.instance }}"
+              description: "Error rate is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+          
+          # GPU utilization too high
+          - alert: GPUUtilizationHigh
+            expr: |
+              avg(DCGM_FI_DEV_GPU_UTIL{job="nvidia-gpu-metrics"}) by (instance, gpu) > 90
+            for: 10m
+            labels:
+              severity: warning
+              team: ml
+            annotations:
+              summary: "GPU utilization high on {{ $labels.instance }}"
+              description: "GPU {{ $labels.gpu }} utilization is {{ $value }}% on {{ $labels.instance }}"
+          
+          # Model inference latency high
+          - alert: ModelInferenceLatencyHigh
+            expr: |
+              model:inference_latency:p95 > 500
+            for: 5m
+            labels:
+              severity: warning
+              team: ml
+            annotations:
+              summary: "Model {{ $labels.model }} inference latency high"
+              description: "P95 latency is {{ $value }}ms for model {{ $labels.model }}"
+          
+          # Pod crash looping
+          - alert: PodCrashLooping
+            expr: |
+              rate(kube_pod_container_status_restarts_total{namespace="deepfake-detection"}[1h]) > 5
+            for: 10m
+            labels:
+              severity: critical
+              team: platform
+            annotations:
+              summary: "Pod {{ $labels.pod }} is crash looping"
+              description: "Pod {{ $labels.pod }} has restarted {{ $value }} times in the last hour"
+          
+          # Database connection pool exhausted
+          - alert: DatabaseConnectionPoolExhausted
+            expr: |
+              pgbouncer_pools_client_active{database="deepfake_detection"} / 
+              pgbouncer_pools_client_maxwait{database="deepfake_detection"} > 0.9
+            for: 5m
+            labels:
+              severity: warning
+              team: platform
+            annotations:
+              summary: "Database connection pool nearly exhausted"
+              description: "Connection pool usage is {{ $value | humanizePercentage }}"
+          
+          # Redis memory usage high
+          - alert: RedisMemoryHigh
+            expr: |
+              redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+            for: 10m
+            labels:
+              severity: warning
+              team: platform
+            annotations:
+              summary: "Redis memory usage high"
+              description: "Redis memory usage is {{ $value | humanizePercentage }}"
+          
+          # Disk space low
+          - alert: DiskSpaceLow
+            expr: |
+              (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.1
+            for: 10m
+            labels:
+              severity: warning
+              team: platform
+            annotations:
+              summary: "Disk space low on {{ $labels.instance }}"
+              description: "Only {{ $value | humanizePercentage }} disk space remaining"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
+data:
+  deepfake-detection-dashboard.json: |
+    {
+      "dashboard": {
+        "title": "Deepfake Detection System",
+        "uid": "deepfake-prod",
+        "timezone": "UTC",
+        "panels": [
+          {
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "id": 1,
+            "title": "Request Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{job=\"deepfake-api\"}[5m]))",
+                "legendFormat": "Total Requests/s"
+              },
+              {
+                "expr": "sum(rate(http_requests_total{job=\"deepfake-api\",status=~\"2..\"}[5m]))",
+                "legendFormat": "Success/s"
+              },
+              {
+                "expr": "sum(rate(http_requests_total{job=\"deepfake-api\",status=~\"5..\"}[5m]))",
+                "legendFormat": "Errors/s"
+              }
+            ]
+          },
+          {
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "id": 2,
+            "title": "Response Time",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"deepfake-api\"}[5m])) by (le))",
+                "legendFormat": "P95"
+              },
+              {
+                "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"deepfake-api\"}[5m])) by (le))",
+                "legendFormat": "P99"
+              }
+            ]
+          },
+          {
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "id": 3,
+            "title": "GPU Utilization",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "avg(DCGM_FI_DEV_GPU_UTIL{job=\"nvidia-gpu-metrics\"}) by (instance, gpu)",
+                "legendFormat": "GPU {{gpu}} - {{instance}}"
+              }
+            ]
+          },
+          {
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "id": 4,
+            "title": "Model Inference Time",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(nv_inference_request_duration_us_bucket{job=\"triton-metrics\"}[5m])) by (model, le)) / 1000",
+                "legendFormat": "{{model}} P95"
+              }
+            ]
+          },
+          {
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+            "id": 5,
+            "title": "Detection Rate",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(rate(deepfake_detections_total{result=\"positive\"}[5m])) / sum(rate(deepfake_detections_total[5m])) * 100",
+                "legendFormat": "Deepfake Detection Rate %"
+              }
+            ]
+          },
+          {
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+            "id": 6,
+            "title": "System Resources",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"deepfake-detection\"}[5m])) by (pod)",
+                "legendFormat": "CPU: {{pod}}"
+              },
+              {
+                "expr": "sum(container_memory_usage_bytes{namespace=\"deepfake-detection\"}) by (pod) / 1024 / 1024 / 1024",
+                "legendFormat": "Memory: {{pod}}"
+              }
+            ]
+          }
+        ]
+      }
+    }
