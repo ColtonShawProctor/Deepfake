@@ -197,6 +197,33 @@ class DeepfakeDetector:
         
         return round(confidence, 1)
     
+    def analyze_batch(self, image_paths: list) -> list:
+        """
+        Analyze multiple images for deepfake detection.
+        
+        Args:
+            image_paths (list): List of paths to image files to analyze
+            
+        Returns:
+            List of analysis results, one for each image
+        """
+        results = []
+        for image_path in image_paths:
+            try:
+                result = self.analyze_image(image_path)
+                results.append(result)
+            except Exception as e:
+                self.logger.error(f"Failed to analyze {image_path}: {str(e)}")
+                results.append({
+                    "confidence_score": 0.0,
+                    "is_deepfake": False,
+                    "analysis_metadata": {},
+                    "analysis_time": datetime.utcnow().isoformat(),
+                    "processing_time_seconds": 0.0,
+                    "error": f"Analysis failed: {str(e)}"
+                })
+        return results
+    
     def _generate_analysis_metadata(
         self,
         width: int,

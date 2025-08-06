@@ -159,7 +159,17 @@ class ResNetDetector(BaseDetector):
             # Perform inference
             with torch.no_grad():
                 output = self.model(input_tensor)
-                confidence_score = output.item() * 100.0
+                # Handle different output shapes
+                output_squeezed = output.squeeze()
+                if output_squeezed.dim() == 0:
+                    # 0-dim tensor (scalar)
+                    confidence_score = output_squeezed.item() * 100.0
+                elif output_squeezed.dim() == 1:
+                    # 1-dim tensor [batch_size]
+                    confidence_score = output_squeezed[0].item() * 100.0
+                else:
+                    # 2-dim tensor [batch_size, num_classes]
+                    confidence_score = output_squeezed[0, 0].item() * 100.0
             
             processing_time = time.time() - start_time
             
@@ -275,7 +285,17 @@ class EfficientNetDetector(BaseDetector):
             # Perform inference
             with torch.no_grad():
                 output = self.model(input_tensor)
-                confidence_score = output.item() * 100.0
+                # Handle different output shapes
+                output_squeezed = output.squeeze()
+                if output_squeezed.dim() == 0:
+                    # 0-dim tensor (scalar)
+                    confidence_score = output_squeezed.item() * 100.0
+                elif output_squeezed.dim() == 1:
+                    # 1-dim tensor [batch_size]
+                    confidence_score = output_squeezed[0].item() * 100.0
+                else:
+                    # 2-dim tensor [batch_size, num_classes]
+                    confidence_score = output_squeezed[0, 0].item() * 100.0
             
             processing_time = time.time() - start_time
             
@@ -379,7 +399,17 @@ class F3NetDetector(BaseDetector):
             # Perform inference
             with torch.no_grad():
                 output = self.model(input_tensor)
-                confidence_score = output.item() * 100.0
+                # Handle different output shapes
+                output_squeezed = output.squeeze()
+                if output_squeezed.dim() == 0:
+                    # 0-dim tensor (scalar)
+                    confidence_score = output_squeezed.item() * 100.0
+                elif output_squeezed.dim() == 1:
+                    # 1-dim tensor [batch_size]
+                    confidence_score = output_squeezed[0].item() * 100.0
+                else:
+                    # 2-dim tensor [batch_size, num_classes]
+                    confidence_score = output_squeezed[0, 0].item() * 100.0
             
             processing_time = time.time() - start_time
             

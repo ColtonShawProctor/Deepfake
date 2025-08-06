@@ -5,7 +5,7 @@ import { analysisAPI } from '../services/api';
 import { useApiError } from '../hooks/useApiError';
 
 const Dashboard = () => {
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, authChecked } = useAuth();
   const navigate = useNavigate();
   const { error, handleError, clearError } = useApiError();
   
@@ -53,10 +53,11 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    if (isAuthenticated) {
+    // Only fetch data if authenticated AND auth check is complete
+    if (isAuthenticated && authChecked) {
       fetchDashboardData();
     }
-  }, [isAuthenticated, fetchDashboardData]);
+  }, [isAuthenticated, authChecked, fetchDashboardData]);
 
   const handleLogout = async () => {
     try {
@@ -94,15 +95,14 @@ const Dashboard = () => {
     }
   };
 
-
-
   // Redirect to login if not authenticated
-  if (!isAuthenticated) {
+  if (!isAuthenticated && authChecked) {
     navigate('/login');
     return null;
   }
 
-  if (loading) {
+  // Show loading while auth is being checked
+  if (!authChecked || loading) {
     return (
       <div className="container mt-5">
         <div className="row justify-content-center">

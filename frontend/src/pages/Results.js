@@ -8,6 +8,7 @@ const Results = () => {
   const { error, handleError, clearError } = useApiError();
   
   const [result, setResult] = useState(null);
+  const [allResults, setAllResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [retryLoading, setRetryLoading] = useState(false);
   const [downloadLoading, setDownloadLoading] = useState(false);
@@ -80,18 +81,47 @@ const Results = () => {
     } finally {
       setLoading(false);
     }
-  }, [fileId, clearError, handleError]); // Remove loading from dependencies to prevent recreation
+  }, [fileId, clearError, handleError]);
+
+  const fetchAllResults = useCallback(async () => {
+    setLoading(true);
+    clearError();
+    
+    try {
+      console.log('Fetching all results...');
+      const response = await analysisAPI.getAllResults(1, 50); // Get first 50 results
+      console.log('All results response:', response);
+      console.log('Response type:', typeof response);
+      console.log('Response length:', Array.isArray(response) ? response.length : 'Not an array');
+      
+      if (Array.isArray(response) && response.length > 0) {
+        console.log('First result structure:', response[0]);
+        console.log('First result detection_result:', response[0].detection_result);
+      }
+      
+      setAllResults(response || []);
+    } catch (err) {
+      handleError(err);
+      console.error('Error fetching all results:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [clearError, handleError]);
 
   useEffect(() => {
     if (fileId) {
+      // Individual result page
       // Reset fetch flag when fileId changes
       if (currentFileIdRef.current !== fileId) {
         hasFetchedRef.current = false;
         currentFileIdRef.current = fileId;
       }
       fetchResult();
+    } else {
+      // General results page - fetch all results
+      fetchAllResults();
     }
-  }, [fileId, fetchResult]); // Add fetchResult back but with stable dependencies
+  }, [fileId, fetchResult, fetchAllResults]);
 
   const handleRetryAnalysis = async () => {
     setRetryLoading(true);
@@ -210,6 +240,7 @@ const Results = () => {
   };
 
   const getVerdictColor = (confidence) => {
+    if (confidence === 0) return 'secondary'; // Pending/Processing
     if (confidence >= 70) return 'danger';
     if (confidence >= 30) return 'warning';
     return 'success';
@@ -276,6 +307,126 @@ const Results = () => {
     );
   }
 
+  // Handle general results page (no fileId)
+  if (!fileId) {
+    return (
+      <div className="container-fluid mt-4">
+        {/* Error Alert */}
+        {error && (
+          <div className="alert alert-danger alert-dismissible fade show" role="alert">
+            <i className="fas fa-exclamation-triangle me-2"></i>
+            {error}
+            <button 
+              type="button" 
+              className="btn-close" 
+              onClick={clearError}
+              aria-label="Close"
+            ></button>
+          </div>
+        )}
+
+        {/* Header */}
+        <div className="row mb-4">
+          <div className="col-12">
+            <div className="d-flex justify-content-between align-items-center">
+              <div>
+                <h1 className="h2 mb-1">
+                  <i className="fas fa-chart-bar me-2 text-primary"></i>
+                  Analysis Results
+                </h1>
+                <p className="text-muted mb-0">
+                  View all your deepfake detection analysis results
+                </p>
+              </div>
+              <Link to="/upload" className="btn btn-primary">
+                <i className="fas fa-plus me-2"></i>
+                New Analysis
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Results List */}
+        {allResults.length === 0 ? (
+          <div className="row justify-content-center">
+            <div className="col-md-8 text-center">
+              <div className="card shadow">
+                <div className="card-body p-5">
+                  <i className="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                  <h5>No Analysis Results</h5>
+                  <p className="text-muted mb-4">You haven't performed any analysis yet. Upload a file to get started!</p>
+                  <Link to="/upload" className="btn btn-primary">
+                    <i className="fas fa-upload me-2"></i>
+                    Upload File
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="row">
+            {allResults.map((result, index) => {
+              // Debug: Log the result structure
+              console.log(`Result ${index}:`, result);
+              
+              // Safely access the confidence score
+              const confidenceScore = result.detection_result?.confidence_score || 0;
+              const isDeepfake = result.detection_result?.is_deepfake || false;
+              
+              return (
+                <div key={index} className="col-md-6 col-lg-4 mb-4">
+                  <div className="card border-0 shadow-sm h-100">
+                    <div className="card-body">
+                      <div className="d-flex align-items-center mb-3">
+                        <i className={`${getFileTypeIcon(result.filename)} fa-2x me-3`}></i>
+                        <div>
+                          <h6 className="card-title mb-1">{result.filename}</h6>
+                          <small className="text-muted">
+                            {new Date(result.created_at).toLocaleDateString()}
+                          </small>
+                        </div>
+                      </div>
+                      
+                      <div className="mb-3">
+                        <div className="d-flex justify-content-between align-items-center mb-2">
+                          <span className="text-muted">Confidence:</span>
+                          <span className={`badge bg-${getConfidenceColor(confidenceScore)}`}>
+                            {confidenceScore === 0 ? 'N/A' : `${confidenceScore.toFixed(1)}%`}
+                          </span>
+                        </div>
+                        <div className="d-flex justify-content-between align-items-center">
+                          <span className="text-muted">Verdict:</span>
+                          <span className={`badge bg-${getVerdictColor(confidenceScore)}`}>
+                            {confidenceScore === 0 ? 'PENDING' : getVerdict(confidenceScore)}
+                          </span>
+                        </div>
+                        <div className="d-flex justify-content-between align-items-center">
+                          <span className="text-muted">Status:</span>
+                          <span className={`badge ${confidenceScore === 0 ? 'bg-secondary' : (isDeepfake ? 'bg-danger' : 'bg-success')}`}>
+                            {confidenceScore === 0 ? 'Processing' : (isDeepfake ? 'Deepfake' : 'Authentic')}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <Link 
+                        to={`/results/${result.file_id}`} 
+                        className="btn btn-outline-primary btn-sm w-100"
+                      >
+                        <i className="fas fa-eye me-2"></i>
+                        View Details
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Handle individual result page (with fileId)
   if (!result) {
     return (
       <div className="container mt-5">

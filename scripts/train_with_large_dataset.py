@@ -93,7 +93,13 @@ class AdvancedModelTrainer:
     def __init__(self, model_name: str, models_dir: str = "models"):
         self.model_name = model_name
         self.models_dir = Path(models_dir)
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # Check for available devices in order of preference: CUDA > MPS > CPU
+        if torch.cuda.is_available():
+            self.device = torch.device("cuda")
+        elif torch.backends.mps.is_available():
+            self.device = torch.device("mps")
+        else:
+            self.device = torch.device("cpu")
         
         # Initialize model
         if model_name == "resnet":

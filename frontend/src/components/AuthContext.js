@@ -14,6 +14,7 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
     // Check if user is authenticated and validate token
@@ -25,9 +26,12 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (error) {
         // Token is invalid, clear auth data
+        console.log('Auth check failed, clearing auth data:', error);
         apiUtils.clearAuth();
+        setUser(null);
       } finally {
         setLoading(false);
+        setAuthChecked(true);
       }
     };
 
@@ -78,7 +82,8 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     loading,
-    isAuthenticated: !!user
+    authChecked,
+    isAuthenticated: !!user && authChecked
   };
 
   return (
