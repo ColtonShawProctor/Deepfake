@@ -1,0 +1,87 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Uploads (user data)
+uploads/
+test_samples/
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# Test files
+test_*.py
+*_test.py
+
+# Training scripts and data (keep core scripts, exclude large datasets)
+training_data/
+improved_training_data/
+datasets/
+
+# Frontend (we'll build this separately if needed)
+frontend/
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Backup files
+backups/
+
+# Evaluation results
+evaluation_results/
+
+# Temporary files
+*.tmp
+*.temp 

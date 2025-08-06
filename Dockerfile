@@ -37,9 +37,12 @@ RUN pip install --no-cache-dir -r requirements_fastapi.txt
 # Copy application code
 COPY app/ ./app/
 COPY main.py .
+COPY models/ ./models/
+COPY scripts/ ./scripts/
+COPY training/ ./training/
 
 # Create necessary directories
-RUN mkdir -p uploads/videos models evaluation_results logs \
+RUN mkdir -p uploads/videos evaluation_results logs \
     && chown -R appuser:appuser /app
 
 # Switch to non-root user
