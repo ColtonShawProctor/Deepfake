@@ -267,9 +267,9 @@ const Results = () => {
   const constructFileUrl = (fileId, filename) => {
     // If we have a file ID, try to construct a URL to the file
     if (fileId) {
-      // Try different possible URL patterns
+      // Use the public endpoint for image display (no authentication required)
       const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-      return `${baseUrl}/api/files/${fileId}`;
+      return `${baseUrl}/api/files/public/${fileId}`;
     }
     return null;
   };

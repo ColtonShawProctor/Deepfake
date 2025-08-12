@@ -100,6 +100,10 @@ async def analyze_file(
             media_file_id=file_id,
             confidence_score=detection_result["confidence_score"] / 100.0,  # Convert to 0-1 scale
             is_deepfake=detection_result["is_deepfake"],
+            model_name=detection_result.get("model_name", "ensemble"),  # Default to ensemble
+            processing_time=detection_result.get("processing_time_seconds", 0.0),  # Default to 0.0
+            uncertainty=detection_result.get("uncertainty"),  # Optional field
+            attention_weights=json.dumps(detection_result.get("attention_weights", [])),  # Optional field
             analysis_time=analysis_time,
             result_metadata=json.dumps(detection_result["analysis_metadata"])
         )
