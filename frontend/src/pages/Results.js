@@ -45,11 +45,6 @@ const Results = () => {
         throw new Error('Invalid response format');
       }
       
-      console.log('Result response:', response);
-      
-      // Debug: Log the full response to see what fields are available
-      console.log('Full API response:', response);
-      
       const transformedResult = {
         id: response.file_id,
         filename: response.filename,
@@ -69,11 +64,6 @@ const Results = () => {
         fileType: response.file_type || response.mime_type || response.content_type || response.type || 'Unknown'
       };
       
-      console.log('Transformed result:', transformedResult);
-      
-      // Note: File URL testing removed to prevent infinite loops
-      // File URLs are constructed but not tested for accessibility
-      
       setResult(transformedResult);
     } catch (err) {
       handleError(err);
@@ -88,17 +78,7 @@ const Results = () => {
     clearError();
     
     try {
-      console.log('Fetching all results...');
       const response = await analysisAPI.getAllResults(1, 50); // Get first 50 results
-      console.log('All results response:', response);
-      console.log('Response type:', typeof response);
-      console.log('Response length:', Array.isArray(response) ? response.length : 'Not an array');
-      
-      if (Array.isArray(response) && response.length > 0) {
-        console.log('First result structure:', response[0]);
-        console.log('First result detection_result:', response[0].detection_result);
-      }
-      
       setAllResults(response || []);
     } catch (err) {
       handleError(err);
@@ -132,9 +112,7 @@ const Results = () => {
     hasFetchedRef.current = false;
     
     try {
-      console.log('Retrying analysis for file ID:', fileId);
       const response = await analysisAPI.analyzeFile(fileId);
-      console.log('Retry analysis response:', response);
       
       // Show success message
       setMessage('Analysis restarted successfully! Checking status...');
@@ -146,7 +124,6 @@ const Results = () => {
       const pollForCompletion = async () => {
         try {
           const resultResponse = await analysisAPI.getResults(parseInt(fileId));
-          console.log('Poll result:', resultResponse);
           
           if (resultResponse.detection_result && resultResponse.detection_result.confidence_score !== undefined) {
             setMessage('Analysis completed! Refreshing results...');
@@ -286,6 +263,77 @@ const Results = () => {
     }
     return fileUrl;
   };
+
+  // Function to capture video frame at specific time
+  const captureVideoFrame = useCallback((videoUrl, timeInSeconds = 1) => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      video.crossOrigin = 'anonymous';
+      video.muted = true;
+      video.playsInline = true;
+      
+      video.onloadedmetadata = () => {
+        // Set canvas size to match video dimensions
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        // Seek to specific time
+        video.currentTime = timeInSeconds;
+      };
+      
+      video.onseeked = () => {
+        try {
+          // Draw the current frame to canvas
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          
+          // Convert to data URL
+          const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
+          resolve(thumbnailUrl);
+          
+          // Clean up
+          video.remove();
+          canvas.remove();
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      video.onerror = () => {
+        reject(new Error('Failed to load video for thumbnail generation'));
+      };
+      
+      // Start loading the video
+      video.src = videoUrl;
+      video.load();
+    });
+  }, []);
+
+  // State for video thumbnail
+  const [videoThumbnail, setVideoThumbnail] = useState(null);
+  const [thumbnailLoading, setThumbnailLoading] = useState(false);
+
+  // Generate video thumbnail when video result is loaded
+  useEffect(() => {
+    if (result && result.fileUrl && (result.fileType?.startsWith('video') || result.filename?.match(/\.(mp4|avi|mov|wmv|flv|webm)$/i))) {
+      setThumbnailLoading(true);
+      setVideoThumbnail(null);
+      
+      captureVideoFrame(getFullFileUrl(result.fileUrl), 1)
+        .then(thumbnail => {
+          setVideoThumbnail(thumbnail);
+        })
+        .catch(error => {
+          console.log('Thumbnail generation failed:', error);
+          // Fallback to info card
+        })
+        .finally(() => {
+          setThumbnailLoading(false);
+        });
+    }
+  }, [result, captureVideoFrame]);
 
   if (loading) {
     return (
@@ -547,32 +595,221 @@ const Results = () => {
               </h5>
             </div>
             <div className="card-body text-center">
+              <style>
+                {`
+                  .video-preview-container {
+                    position: relative;
+                    overflow: hidden;
+                  }
+                  
+                  .video-thumbnail-container {
+                    position: relative;
+                  }
+                  
+                  .thumbnail-overlay {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0,0,0,0.3);
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    align-items: center;
+                    opacity: 0;
+                    transition: opacity 0.3s ease;
+                  }
+                  
+                  .video-thumbnail-container:hover .thumbnail-overlay {
+                    opacity: 1;
+                  }
+                  
+                  .play-button {
+                    background: rgba(0,0,0,0.7);
+                    border-radius: 50%;
+                    width: 80px;
+                    height: 80px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border: 3px solid rgba(255,255,255,0.8);
+                    margin-bottom: 20px;
+                  }
+                  
+                  .thumbnail-info {
+                    position: absolute;
+                    top: 10px;
+                    right: 10px;
+                  }
+                  
+                  .video-info-card {
+                    border: 1px solid #dee2e6;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                  }
+                  
+                  .video-info-summary {
+                    border: 1px solid #dee2e6;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                  }
+                  
+                  .video-details .detail-row {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 4px 0;
+                  }
+                  
+                  .analysis-result {
+                    border: 1px solid #dee2e6;
+                    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+                  }
+                  
+                  .analysis-result .badge {
+                    font-size: 14px;
+                    padding: 8px 16px;
+                  }
+                  
+                  .badge-sm {
+                    font-size: 12px;
+                    padding: 4px 8px;
+                  }
+                `}
+              </style>
               {result.fileUrl ? (
                 result.fileType?.startsWith('video') || result.filename?.match(/\.(mp4|avi|mov|wmv|flv|webm)$/i) ? (
-                  <video 
-                    controls 
-                    className="img-fluid rounded"
-                    style={{ maxHeight: '400px' }}
-                    onError={(e) => {
-                      console.error('Video loading error:', e);
-                      console.error('Video URL:', getFullFileUrl(result.fileUrl));
-                      console.error('File info:', {
-                        fileUrl: result.fileUrl,
-                        fileType: result.fileType,
-                        fileSize: result.fileSize,
-                        filename: result.filename
-                      });
-                      e.target.style.display = 'none';
-                      // Show the fallback display
-                      const fallback = document.getElementById('fallback-display');
-                      if (fallback) {
-                        fallback.classList.remove('d-none');
-                      }
-                    }}
-                  >
-                    <source src={getFullFileUrl(result.fileUrl)} type={result.fileType} />
-                    Your browser does not support the video tag.
-                  </video>
+                  <div className="video-preview-container">
+                    {thumbnailLoading ? (
+                      <div className="video-info-card p-4 bg-light rounded text-center">
+                        <div className="spinner-border text-primary mb-3" role="status">
+                          <span className="visually-hidden">Loading...</span>
+                        </div>
+                        <p className="text-muted">Generating video thumbnail...</p>
+                      </div>
+                    ) : videoThumbnail ? (
+                      <div className="video-thumbnail-container">
+                        <img 
+                          src={videoThumbnail} 
+                          alt={`Video thumbnail - ${result.filename}`}
+                          className="img-fluid rounded"
+                          style={{ maxHeight: '400px', width: '100%' }}
+                        />
+                        <div className="thumbnail-overlay">
+                          <div className="play-button">
+                            <i className="fas fa-play fa-2x text-white"></i>
+                          </div>
+                          <div className="thumbnail-info">
+                            <span className="badge bg-dark">Frame at 1s</span>
+                          </div>
+                        </div>
+                        
+                        {/* Video info below thumbnail */}
+                        <div className="video-info-summary mt-3 p-3 bg-light rounded">
+                          <h6 className="text-dark mb-2">{result.filename}</h6>
+                          <div className="row text-center">
+                            <div className="col-4">
+                              <small className="text-muted">Size</small><br/>
+                              <span className="fw-bold">{formatFileSize(result.fileSize)}</span>
+                            </div>
+                            <div className="col-4">
+                              <small className="text-muted">Result</small><br/>
+                              <span className={`badge bg-${result.isDeepfake ? 'danger' : 'success'} badge-sm`}>
+                                {result.isDeepfake ? 'Deepfake' : 'Real'}
+                              </span>
+                            </div>
+                            <div className="col-4">
+                              <small className="text-muted">Confidence</small><br/>
+                              <span className="fw-bold">{result.confidence?.toFixed(1)}%</span>
+                            </div>
+                          </div>
+                          
+                          <div className="text-center mt-3">
+                            <a 
+                              href={getFullFileUrl(result.fileUrl)} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="btn btn-primary btn-sm me-2"
+                            >
+                              <i className="fas fa-download me-1"></i>
+                              Download
+                            </a>
+                            <button 
+                              className="btn btn-outline-secondary btn-sm"
+                              onClick={() => {
+                                window.open(getFullFileUrl(result.fileUrl), '_blank');
+                              }}
+                            >
+                              <i className="fas fa-external-link-alt me-1"></i>
+                              Open
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="video-info-card p-4 bg-light rounded">
+                        <div className="text-center mb-3">
+                          <i className="fas fa-video fa-4x text-primary"></i>
+                        </div>
+                        
+                        <h6 className="text-dark mb-3">{result.filename}</h6>
+                        
+                        <div className="video-details">
+                          <div className="detail-row mb-2">
+                            <span className="text-muted">File Size:</span>
+                            <span className="fw-bold">{formatFileSize(result.fileSize)}</span>
+                          </div>
+                          <div className="detail-row mb-2">
+                            <span className="text-muted">File Type:</span>
+                            <span className="fw-bold">{result.fileType || 'Video'}</span>
+                          </div>
+                          <div className="detail-row mb-2">
+                            <span className="text-muted">Analysis Time:</span>
+                            <span className="fw-bold">{result.analysisTime}</span>
+                          </div>
+                          <div className="detail-row mb-2">
+                            <span className="text-muted">Upload Date:</span>
+                            <span className="fw-bold">{result.uploadDate}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="analysis-result mt-3 p-3 bg-white rounded">
+                          <div className="text-center">
+                            <span className="text-muted">Result: </span>
+                            <span className={`badge bg-${result.isDeepfake ? 'danger' : 'success'} fs-6`}>
+                              {result.isDeepfake ? 'Deepfake Detected' : 'Real Video'}
+                            </span>
+                          </div>
+                          <div className="text-center mt-2">
+                            <span className="text-muted">Confidence: </span>
+                            <span className="fw-bold">{result.confidence?.toFixed(1)}%</span>
+                          </div>
+                        </div>
+                        
+                        <div className="text-center mt-3">
+                          <a 
+                            href={getFullFileUrl(result.fileUrl)} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="btn btn-primary me-2"
+                          >
+                            <i className="fas fa-download me-2"></i>
+                            Download Video
+                          </a>
+                          <button 
+                            className="btn btn-outline-secondary"
+                            onClick={() => {
+                              // Try to open video in new tab
+                              window.open(getFullFileUrl(result.fileUrl), '_blank');
+                            }}
+                          >
+                            <i className="fas fa-external-link-alt me-2"></i>
+                            Open Video
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <img 
                     src={getFullFileUrl(result.fileUrl)} 
@@ -580,14 +817,6 @@ const Results = () => {
                     className="img-fluid rounded"
                     style={{ maxHeight: '400px' }}
                     onError={(e) => {
-                      console.error('Image loading error:', e);
-                      console.error('Image URL:', getFullFileUrl(result.fileUrl));
-                      console.error('File info:', {
-                        fileUrl: result.fileUrl,
-                        fileType: result.fileType,
-                        fileSize: result.fileSize,
-                        filename: result.filename
-                      });
                       e.target.style.display = 'none';
                       // Show the fallback display
                       const fallback = document.getElementById('fallback-display');
@@ -601,35 +830,37 @@ const Results = () => {
               
               {/* Fallback display when no media URL or media fails to load */}
               <div className={`py-5 ${result.fileUrl ? 'd-none' : ''}`} id="fallback-display">
-                {process.env.NODE_ENV === 'development' && (
-                  <div className="alert alert-info small mb-3">
-                    <strong>Debug Info:</strong><br />
-                    File URL: {result.fileUrl || 'Not available'}<br />
-                    File Type: {result.fileType || 'Not available'}<br />
-                    File Size: {result.fileSize || 'Not available'}
-                  </div>
-                )}
                 <i className={`${getFileTypeIcon(result.filename)} fa-4x text-muted mb-3`}></i>
                 <h6 className="text-muted">{result.filename}</h6>
                 <p className="text-muted small">
                   File size: {formatFileSize(result.fileSize)}
                 </p>
-                {result.fileUrl && (
+                {result.fileUrl ? (
                   <div className="mt-3">
-                    <small className="text-muted">
-                      <i className="fas fa-info-circle me-1"></i>
-                      Media preview not available
-                    </small>
-                    <br />
-                    <a 
-                      href={getFullFileUrl(result.fileUrl)} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="btn btn-sm btn-outline-primary mt-2"
-                    >
-                      <i className="fas fa-external-link-alt me-1"></i>
-                      Open Media
-                    </a>
+                    <div className="video-placeholder p-4 bg-light rounded">
+                      <i className="fas fa-video fa-3x text-primary mb-3"></i>
+                      <h6 className="text-primary">Video File Ready</h6>
+                      <p className="text-muted small mb-3">
+                        This video has been analyzed for deepfake detection.
+                      </p>
+                      <a 
+                        href={getFullFileUrl(result.fileUrl)} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="btn btn-sm btn-outline-primary"
+                      >
+                        <i className="fas fa-download me-1"></i>
+                        Download Video
+                      </a>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3">
+                    <div className="alert alert-info">
+                      <i className="fas fa-info-circle me-2"></i>
+                      <strong>File Information</strong><br />
+                      <small>This file has been processed for deepfake detection.</small>
+                    </div>
                   </div>
                 )}
               </div>

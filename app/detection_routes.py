@@ -9,12 +9,12 @@ from app.models.user import User
 from app.models.media_file import MediaFile
 from app.models.detection_result import DetectionResult as DetectionResultModel
 from app.schemas import DetectionResponse, DetectorInfo
-from app.utils.deepfake_detector import DeepfakeDetector
+from app.models.optimized_efficientnet_detector import OptimizedEfficientNetDetector
 
 router = APIRouter(prefix="/api/detection", tags=["deepfake detection"])
 
-# Initialize the detector
-detector = DeepfakeDetector()
+# Initialize the single EfficientNet detector
+detector = OptimizedEfficientNetDetector("models/efficientnet_weights.pth")
 
 @router.get("/info", response_model=DetectorInfo)
 async def get_detector_info():
@@ -57,35 +57,53 @@ async def analyze_file(
         )
     
     try:
-        # Perform deepfake detection
-        detection_result = detector.analyze_image(str(file_path))
+        # Perform deepfake detection with single EfficientNet model
+        detection_result = detector.predict(str(file_path))
         
         # Store result in database
         from datetime import datetime
-        analysis_time = datetime.fromisoformat(detection_result["analysis_time"].replace('Z', '+00:00'))
+        analysis_time = datetime.utcnow()
         
         db_detection_result = DetectionResultModel(
             media_file_id=media_file.id,
-            confidence_score=detection_result["confidence_score"] / 100.0,  # Convert to 0-1 scale
+            confidence_score=detection_result["confidence"],  # Already 0-1 scale
             is_deepfake=detection_result["is_deepfake"],
-            model_name=detection_result.get("model_name", "ensemble"),  # Default to ensemble
-            processing_time=detection_result.get("processing_time_seconds", 0.0),  # Default to 0.0
-            uncertainty=detection_result.get("uncertainty"),  # Optional field
-            attention_weights=json.dumps(detection_result.get("attention_weights", [])),  # Optional field
+            model_name=detection_result.get("model", "efficientnet"),  # Single model name
+            processing_time=detection_result.get("inference_time", 0.0),  # Inference time
+            uncertainty=None,  # Single model doesn't have ensemble uncertainty
+            attention_weights=None,  # Single model doesn't have ensemble weights
             analysis_time=analysis_time,
-            result_metadata=json.dumps(detection_result["analysis_metadata"])
+            result_metadata=json.dumps({
+                "method": detection_result.get("method", "single"),
+                "device": detection_result.get("device", "cpu"),
+                "input_size": detection_result.get("input_size", [224, 224]),
+                "tta_enabled": detection_result.get("method") == "tta"
+            })
         )
         
         db.add(db_detection_result)
         db.commit()
         db.refresh(db_detection_result)
         
+        # Create proper DetectionResult object from detector response
+        from app.schemas import DetectionResult
+        from datetime import datetime
+        
+        detection_result_obj = DetectionResult(
+            confidence_score=detection_result["confidence"],
+            is_deepfake=detection_result["is_deepfake"],
+            analysis_metadata=None,  # Could be populated with additional metadata
+            analysis_time=analysis_time.isoformat(),
+            processing_time_seconds=detection_result.get("inference_time", 0.0),
+            error=None
+        )
+        
         return DetectionResponse(
             success=True,
             message="Deepfake analysis completed successfully",
             file_id=media_file.id,
             filename=media_file.filename,
-            detection_result=detection_result,
+            detection_result=detection_result_obj,
             created_at=db_detection_result.analysis_time
         )
         
@@ -116,7 +134,7 @@ async def get_detection_result(
     if not media_file:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="File not found or access denied"
+            detail="File not found"
         )
     
     # Get the latest detection result
@@ -137,11 +155,11 @@ async def get_detection_result(
         metadata = {}
     
     api_detection_result = {
-        "confidence_score": detection_result.confidence_score * 100.0,  # Convert back to 0-100 scale
+        "confidence_score": detection_result.confidence_score,  # Already in 0-100 scale
         "is_deepfake": detection_result.is_deepfake,
         "analysis_metadata": metadata,
         "analysis_time": detection_result.analysis_time.isoformat(),
-        "processing_time_seconds": 0.0,  # Not stored in DB
+        "processing_time_seconds": detection_result.processing_time,  # Use stored processing time
         "error": None
     }
     
@@ -179,11 +197,11 @@ async def get_user_detection_results(
                 metadata = {}
             
             api_detection_result = {
-                "confidence_score": result.confidence_score * 100.0,
+                "confidence_score": result.confidence_score,
                 "is_deepfake": result.is_deepfake,
                 "analysis_metadata": metadata,
                 "analysis_time": result.analysis_time.isoformat(),
-                "processing_time_seconds": 0.0,
+                "processing_time_seconds": result.processing_time,
                 "error": None
             }
             

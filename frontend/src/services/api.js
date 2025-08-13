@@ -5,7 +5,13 @@ import requestThrottle from '../utils/requestThrottle';
 // Get API configuration
 const config = getApiConfig() || {
   BASE_URL: 'http://localhost:8000',
-  TIMEOUT: 30000,
+  TIMEOUT: 300000, // Default timeout
+  TIMEOUTS: {
+    DEFAULT: 30000,
+    IMAGE_ANALYSIS: 60000,
+    VIDEO_ANALYSIS: 300000,
+    UPLOAD: 600000
+  },
   AUTH: {
     TOKEN_KEY: 'token',
     USER_KEY: 'user'
@@ -21,6 +27,8 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+
 
 // Request interceptor to add auth token to all requests
 api.interceptors.request.use(
@@ -221,18 +229,47 @@ export const fileAPI = {
 
 // Analysis API functions
 export const analysisAPI = {
-  // Analyze file
+  // Analyze file using Detection API
   analyzeFile: async (fileId, options = {}) => {
     const requestKey = `analyzeFile-${fileId}`;
     
     return requestThrottle.throttle(requestKey, async () => {
       try {
+        // Use the detection analysis endpoint for all files
         const response = await api.post(`/api/detection/analyze/${fileId}`, options);
         return response.data;
       } catch (error) {
         throw error;
       }
     });
+  },
+
+  // Analyze file directly using Single Model API (for immediate analysis)
+  analyzeFileDirect: async (file) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // First upload the file
+      const uploadResponse = await api.post('/api/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      // Check if upload was successful by looking for file_id
+      if (uploadResponse.data.file_id) {
+        const fileId = uploadResponse.data.file_id;
+        
+        // Then analyze the uploaded file
+        const analysisResponse = await api.post(`/api/detection/analyze/${fileId}`);
+        return analysisResponse.data;
+      } else {
+        throw new Error('File upload failed');
+      }
+    } catch (error) {
+      throw error;
+    }
   },
 
   // Get analysis status
@@ -251,8 +288,17 @@ export const analysisAPI = {
     
     return requestThrottle.throttle(requestKey, async () => {
       try {
-        const response = await api.get(`/api/detection/results/${fileId}`);
-        return response.data;
+        // Try multiple endpoints to find the right one
+        try {
+          // First try the detection router endpoint
+          const response = await api.get(`/api/detection/results/${fileId}`);
+          return response.data;
+        } catch (detectionError) {
+          console.log('Detection endpoint failed, trying analysis endpoint...');
+          // Try the analysis router endpoint
+          const response = await api.get(`/api/analysis/results/${fileId}`);
+          return response.data;
+        }
       } catch (error) {
         throw error;
       }
@@ -262,10 +308,21 @@ export const analysisAPI = {
   // Get all user's analysis results
   getAllResults: async (page = 1, limit = 10) => {
     try {
-      const response = await api.get('/api/analysis/history', {
-        params: { page, limit }
-      });
-      return response.data;
+      // Try multiple endpoints to find the right one
+      try {
+        // First try the analysis router endpoint
+        const response = await api.get('/api/analysis/history', {
+          params: { page, limit }
+        });
+        return response.data;
+              } catch (analysisError) {
+          console.log('Analysis history endpoint failed, trying detection endpoint...');
+          // Try the detection router endpoint
+          const response = await api.get('/api/detection/results', {
+            params: { page, limit }
+          });
+          return response.data;
+        }
     } catch (error) {
       throw error;
     }
@@ -285,6 +342,37 @@ export const analysisAPI = {
   getStats: async () => {
     try {
       const response = await api.get('/api/analysis/stats');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Video-specific API functions
+    // Get video analysis results
+  getVideoResults: async (fileId) => {
+    try {
+      const response = await api.get(`/api/video/results/${fileId}`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Get video analysis progress
+  getVideoProgress: async (taskId) => {
+    try {
+      const response = await api.get(`/api/video/progress/${taskId}`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // List user's video files
+  listUserVideos: async () => {
+    try {
+      const response = await api.get('/api/video/list');
       return response.data;
     } catch (error) {
       throw error;

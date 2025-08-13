@@ -130,17 +130,21 @@ const Upload = () => {
       setUploading(false);
       setAnalyzing(true);
 
-      // Start analysis and wait for completion
+      // Start analysis using the uploaded file ID instead of uploading again
       const analysisResponse = await analysisAPI.analyzeFile(uploadResponse.file_id);
       
       // Check if analysis is complete
-      if (analysisResponse && analysisResponse.success) {
+      if (analysisResponse && analysisResponse.detection_result && analysisResponse.detection_result.is_deepfake !== undefined) {
         // Analysis is complete, redirect immediately
-        navigate(`/results/${uploadResponse.file_id}`);
+        navigate(`/results/${uploadResponse.file_id}`, { 
+          state: { analysisResult: analysisResponse } 
+        });
       } else {
         // If analysis response doesn't confirm completion, wait a bit
         setTimeout(() => {
-          navigate(`/results/${uploadResponse.file_id}`);
+          navigate(`/results/${uploadResponse.file_id}`, { 
+            state: { analysisResult: analysisResponse } 
+          });
         }, 1000);
       }
 
