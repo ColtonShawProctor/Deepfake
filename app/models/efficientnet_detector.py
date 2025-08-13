@@ -16,7 +16,7 @@ from PIL import Image
 from torchvision import models, transforms
 
 from .base_detector import BaseDetector, DetectionResult, ModelInfo, ModelStatus
-from .preprocessing import PreprocessingConfig, UnifiedPreprocessor
+from .preprocessing import PreprocessingConfig, UnifiedPreprocessor, AugmentationType, InterpolationMethod
 
 
 class EfficientNetB4(nn.Module):
@@ -49,19 +49,33 @@ class EfficientNetB4(nn.Module):
                 logging.warning("EfficientNet-B4 loaded without pre-trained weights")
         
         # Get number of features from classifier
-        num_features = self.efficientnet.classifier.in_features
+        try:
+            num_features = self.efficientnet.classifier.in_features
+        except AttributeError:
+            # Fallback: try to get the input size from the first layer
+            try:
+                if hasattr(self.efficientnet.classifier, 'in_features'):
+                    num_features = self.efficientnet.classifier.in_features
+                else:
+                    # Default EfficientNet-B4 input features
+                    num_features = 1792
+                    logging.warning("Could not determine input features, using default: 1792")
+            except Exception:
+                # Ultimate fallback
+                num_features = 1792
+                logging.warning("Using fallback input features: 1792")
         
         # Replace classifier for binary classification
+        # Use dimensions that match the saved model weights exactly
         self.efficientnet.classifier = nn.Sequential(
-            nn.Dropout(p=dropout_rate, inplace=True),
-            nn.Linear(num_features, 512),
-            nn.ReLU(inplace=True),
-            nn.Dropout(p=dropout_rate * 0.5, inplace=True),
-            nn.Linear(512, 128),
-            nn.ReLU(inplace=True),
-            nn.Dropout(p=dropout_rate * 0.3, inplace=True),
-            nn.Linear(128, num_classes),
-            nn.Sigmoid()
+            nn.Dropout(p=dropout_rate, inplace=True),           # Layer 0
+            nn.Linear(num_features, 256),                       # Layer 1
+            nn.ReLU(inplace=True),                              # Layer 2
+            nn.Dropout(p=dropout_rate * 0.5, inplace=True),    # Layer 3
+            nn.Linear(256, 64),                                 # Layer 4
+            nn.ReLU(inplace=True),                              # Layer 5
+            nn.Linear(64, num_classes),                         # Layer 6
+            nn.Sigmoid()                                         # Layer 7
         )
         
         # Store intermediate features for attention visualization
@@ -148,9 +162,9 @@ class EfficientNetPreprocessor(UnifiedPreprocessor):
             std=[0.229, 0.224, 0.225],   # ImageNet normalization
             normalize=True,
             augment=enable_augmentation,
-            augmentation_type="basic" if enable_augmentation else "none",
+            augmentation_type=AugmentationType.BASIC if enable_augmentation else AugmentationType.NONE,
             preserve_aspect_ratio=True,
-            interpolation="bilinear",
+            interpolation=InterpolationMethod.BILINEAR,
             color_mode="RGB",
             enable_face_detection=True,  # Enable face detection for deepfake
             face_crop_margin=0.1,
@@ -272,14 +286,25 @@ class EfficientNetDetector(BaseDetector):
                 
                 if isinstance(checkpoint, dict):
                     if 'model_state_dict' in checkpoint:
-                        self.model.load_state_dict(checkpoint['model_state_dict'])
+                        state_dict = checkpoint['model_state_dict']
                     elif 'state_dict' in checkpoint:
-                        self.model.load_state_dict(checkpoint['state_dict'])
+                        state_dict = checkpoint['state_dict']
                     else:
-                        self.model.load_state_dict(checkpoint)
+                        state_dict = checkpoint
                 else:
-                    self.model.load_state_dict(checkpoint)
+                    state_dict = checkpoint
                 
+                # Fix the state dict keys to match our model structure
+                fixed_state_dict = {}
+                for key, value in state_dict.items():
+                    # Remove 'efficientnet.' prefix if it exists, or add it if it doesn't
+                    if key.startswith('efficientnet.'):
+                        fixed_key = key
+                    else:
+                        fixed_key = f'efficientnet.{key}'
+                    fixed_state_dict[fixed_key] = value
+                
+                self.model.load_state_dict(fixed_state_dict)
                 self.logger.info("Fine-tuned weights loaded successfully")
             else:
                 self.logger.info("Using ImageNet pre-trained weights")

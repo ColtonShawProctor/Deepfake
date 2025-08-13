@@ -154,14 +154,17 @@ async def get_detection_result(
     except json.JSONDecodeError:
         metadata = {}
     
-    api_detection_result = {
-        "confidence_score": detection_result.confidence_score,  # Already in 0-100 scale
-        "is_deepfake": detection_result.is_deepfake,
-        "analysis_metadata": metadata,
-        "analysis_time": detection_result.analysis_time.isoformat(),
-        "processing_time_seconds": detection_result.processing_time,  # Use stored processing time
-        "error": None
-    }
+    # Create proper DetectionResult object
+    from app.schemas import DetectionResult
+    
+    api_detection_result = DetectionResult(
+        confidence_score=detection_result.confidence_score,  # Already in 0-100 scale
+        is_deepfake=detection_result.is_deepfake,
+        analysis_metadata=metadata,
+        analysis_time=detection_result.analysis_time.isoformat(),
+        processing_time_seconds=detection_result.processing_time,  # Use stored processing time
+        error=None
+    )
     
     return DetectionResponse(
         success=True,
@@ -196,14 +199,15 @@ async def get_user_detection_results(
             except json.JSONDecodeError:
                 metadata = {}
             
-            api_detection_result = {
-                "confidence_score": result.confidence_score,
-                "is_deepfake": result.is_deepfake,
-                "analysis_metadata": metadata,
-                "analysis_time": result.analysis_time.isoformat(),
-                "processing_time_seconds": result.processing_time,
-                "error": None
-            }
+            # Create proper DetectionResult object
+            api_detection_result = DetectionResult(
+                confidence_score=result.confidence_score,
+                is_deepfake=result.is_deepfake,
+                analysis_metadata=metadata,
+                analysis_time=result.analysis_time.isoformat(),
+                processing_time_seconds=result.processing_time,
+                error=None
+            )
             
             response_list.append(DetectionResponse(
                 success=True,
