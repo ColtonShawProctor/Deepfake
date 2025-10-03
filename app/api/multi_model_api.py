@@ -34,6 +34,7 @@ from ..models.core_architecture import (
 from ..models.mesonet_detector import MesoNetDetector, MesoNetConfig
 from ..models.deepfake_models import ResNetDetector, EfficientNetDetector, F3NetDetector
 from ..models.model_selector import ModelSelector
+from ..models.preprocessing_manager import UnifiedPreprocessingManager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -98,6 +99,9 @@ class MultiModelAPI:
         
         # Initialize intelligent model selector
         self.model_selector = ModelSelector()
+        
+        # Initialize unified preprocessing manager
+        self.preprocessing_manager = UnifiedPreprocessingManager()
         
         # Task tracking
         self.active_tasks: Dict[str, Dict] = {}
@@ -169,8 +173,15 @@ class MultiModelAPI:
             if not model_instances:
                 raise ValueError("No valid models available")
             
-            # Process with selected models
-            model_results = await self.async_manager.process_image_async(image, model_instances)
+            # Use unified preprocessing for selected models
+            preprocessing_result = self.preprocessing_manager.preprocess_for_models(
+                image, models, use_cache=True
+            )
+            
+            # Process with selected models using preprocessed images
+            model_results = await self._process_with_preprocessed_images(
+                preprocessing_result, model_instances
+            )
             
             # Calculate overall results
             confidences = [result.confidence_score for result in model_results.values()]
@@ -218,6 +229,35 @@ class MultiModelAPI:
                 processing_time=processing_time,
                 metadata={"error": str(e)}
             )
+    
+    async def _process_with_preprocessed_images(self, preprocessing_result, model_instances):
+        """Process preprocessed images with selected models."""
+        try:
+            model_results = {}
+            
+            # Process each model with its preprocessed image
+            for model_name, model in model_instances.items():
+                if model_name in preprocessing_result.processed_images:
+                    # Get preprocessed image for this model
+                    processed_img = preprocessing_result.processed_images[model_name]
+                    
+                    # Run model prediction
+                    start_time = time.time()
+                    result = model.predict(processed_img)
+                    processing_time = time.time() - start_time
+                    
+                    # Update processing time to include preprocessing
+                    result.processing_time += preprocessing_result.preprocessing_time
+                    
+                    model_results[model_name] = result
+                else:
+                    self.logger.warning(f"No preprocessed image for model {model_name}")
+            
+            return model_results
+            
+        except Exception as e:
+            self.logger.error(f"Preprocessed image processing failed: {str(e)}")
+            raise
     
     async def analyze_image_ensemble(self, image) -> MultiModelResult:
         """Analyze image with ensemble"""
@@ -627,4 +667,69 @@ async def get_model_selection_info():
         
     except Exception as e:
         logger.error(f"Model selection info failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get model selection info: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Failed to get model selection info: {str(e)}")
+
+
+@router.get("/preprocessing/stats")
+async def get_preprocessing_stats():
+    """Get preprocessing performance statistics"""
+    try:
+        if not hasattr(api_instance, 'preprocessing_manager'):
+            raise HTTPException(status_code=503, detail="Preprocessing manager not available")
+        
+        stats = api_instance.preprocessing_manager.get_performance_stats()
+        
+        return {
+            "preprocessing_stats": stats,
+            "optimization_enabled": True,
+            "unified_preprocessing": True
+        }
+        
+    except Exception as e:
+        logger.error(f"Preprocessing stats failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get preprocessing stats: {str(e)}")
+
+
+@router.post("/analyze/ultra-optimized")
+async def analyze_image_ultra_optimized(file: UploadFile = File(...)):
+    """Analyze image with full optimization (model selection + unified preprocessing)"""
+    try:
+        # Validate file type
+        if not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="File must be an image")
+        
+        # Read and process image
+        image_data = await file.read()
+        image = Image.open(io.BytesIO(image_data))
+        
+        # Convert to RGB if necessary
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        
+        # Analyze with full optimization
+        result = await api_instance.analyze_image_multi_model(image)
+        
+        # Get preprocessing stats
+        preprocessing_stats = api_instance.preprocessing_manager.get_performance_stats()
+        
+        return {
+            "task_id": result.task_id,
+            "overall_confidence": result.overall_confidence,
+            "overall_verdict": result.overall_verdict,
+            "processing_time": result.processing_time,
+            "model_results": {
+                name: {
+                    "confidence": model_result.confidence_score,
+                    "verdict": model_result.verdict,
+                    "processing_time": model_result.processing_time
+                } for name, model_result in result.model_results.items()
+            },
+            "optimization_info": result.metadata,
+            "preprocessing_stats": preprocessing_stats,
+            "ultra_optimization": True,
+            "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        logger.error(f"Ultra-optimized analysis failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}") 
