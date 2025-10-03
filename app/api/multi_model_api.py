@@ -33,6 +33,7 @@ from ..models.core_architecture import (
 )
 from ..models.mesonet_detector import MesoNetDetector, MesoNetConfig
 from ..models.deepfake_models import ResNetDetector, EfficientNetDetector, F3NetDetector
+from ..models.model_selector import ModelSelector
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -95,6 +96,9 @@ class MultiModelAPI:
         self.resource_manager = ResourceManager(ResourceConfig())
         self.error_handler = ErrorHandler(ErrorConfig())
         
+        # Initialize intelligent model selector
+        self.model_selector = ModelSelector()
+        
         # Task tracking
         self.active_tasks: Dict[str, Dict] = {}
         
@@ -135,27 +139,32 @@ class MultiModelAPI:
             self.logger.error(f"Failed to initialize models: {str(e)}")
     
     async def analyze_image_multi_model(self, image, models: Optional[List[str]] = None) -> MultiModelResult:
-        """Analyze image with multiple models"""
+        """Analyze image with intelligent model selection"""
         task_id = str(uuid.uuid4())
         start_time = time.time()
         
         try:
-            # Determine which models to use
+            # Analyze input to determine optimal model selection
+            input_analysis = self.model_selector.analyze_input(image)
+            
+            # Get available models
+            available_models = {name: model for name, model in self.registry.models.items() if model.is_loaded()}
+            
+            # Use intelligent model selection if no specific models requested
             if models is None:
-                models = self.registry.list_models()
+                models = self.model_selector.select_models(input_analysis, available_models, max_models=3)
+                self.logger.info(f"Intelligent model selection: {models} for {input_analysis.complexity.value} complexity")
+            else:
+                # Validate requested models
+                invalid_models = [m for m in models if m not in available_models]
+                if invalid_models:
+                    raise ValueError(f"Invalid models: {invalid_models}")
             
-            # Validate models
-            available_models = self.registry.list_models()
-            invalid_models = [m for m in models if m not in available_models]
-            if invalid_models:
-                raise ValueError(f"Invalid models: {invalid_models}")
-            
-            # Get model instances
+            # Get model instances for selected models
             model_instances = {}
             for model_name in models:
-                model = self.registry.get_model(model_name)
-                if model and model.is_loaded():
-                    model_instances[model_name] = model
+                if model_name in available_models:
+                    model_instances[model_name] = available_models[model_name]
             
             if not model_instances:
                 raise ValueError("No valid models available")
@@ -170,6 +179,9 @@ class MultiModelAPI:
             
             processing_time = time.time() - start_time
             
+            # Get selection rationale for metadata
+            selection_rationale = self.model_selector.get_selection_rationale(input_analysis, models)
+            
             return MultiModelResult(
                 task_id=task_id,
                 overall_confidence=overall_confidence,
@@ -180,7 +192,15 @@ class MultiModelAPI:
                 metadata={
                     "models_used": list(model_results.keys()),
                     "total_models": len(model_results),
-                    "success_rate": len(model_results) / len(models)
+                    "success_rate": len(model_results) / len(models),
+                    "input_analysis": {
+                        "complexity": input_analysis.complexity.value,
+                        "face_confidence": input_analysis.face_confidence,
+                        "image_quality": input_analysis.image_quality,
+                        "noise_level": input_analysis.noise_level
+                    },
+                    "selection_rationale": selection_rationale,
+                    "optimization_enabled": True
                 }
             )
             
@@ -530,4 +550,81 @@ async def health_check():
             "status": "unhealthy",
             "error": str(e),
             "timestamp": time.time()
-        } 
+        }
+
+# ============================================================================
+# Optimization Endpoints
+# ============================================================================
+
+@router.post("/analyze/optimized")
+async def analyze_image_optimized(file: UploadFile = File(...)):
+    """Analyze image with intelligent model selection optimization"""
+    try:
+        # Validate file type
+        if not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="File must be an image")
+        
+        # Read and process image
+        image_data = await file.read()
+        image = Image.open(io.BytesIO(image_data))
+        
+        # Convert to RGB if necessary
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        
+        # Analyze with intelligent model selection
+        result = await api_instance.analyze_image_multi_model(image)
+        
+        return {
+            "task_id": result.task_id,
+            "overall_confidence": result.overall_confidence,
+            "overall_verdict": result.overall_verdict,
+            "processing_time": result.processing_time,
+            "model_results": {
+                name: {
+                    "confidence": model_result.confidence_score,
+                    "verdict": model_result.verdict,
+                    "processing_time": model_result.processing_time
+                } for name, model_result in result.model_results.items()
+            },
+            "optimization_info": result.metadata,
+            "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        logger.error(f"Optimized analysis failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+
+@router.get("/model-selection/info")
+async def get_model_selection_info():
+    """Get information about intelligent model selection capabilities"""
+    try:
+        if not hasattr(api_instance, 'model_selector'):
+            raise HTTPException(status_code=503, detail="Model selector not available")
+        
+        selector = api_instance.model_selector
+        
+        return {
+            "available_models": list(selector.model_profiles.keys()),
+            "model_profiles": {
+                name: {
+                    "performance_tier": profile.performance_tier.value,
+                    "base_accuracy": profile.base_accuracy,
+                    "base_inference_time": profile.base_inference_time,
+                    "memory_usage": profile.memory_usage,
+                    "priority": profile.priority
+                } for name, profile in selector.model_profiles.items()
+            },
+            "selection_criteria": {
+                "max_inference_time": selector.max_inference_time,
+                "max_memory_usage": selector.max_memory_usage,
+                "min_accuracy_threshold": selector.min_accuracy_threshold
+            },
+            "complexity_levels": [level.value for level in selector.InputComplexity],
+            "performance_tiers": [tier.value for tier in selector.ModelPerformanceTier]
+        }
+        
+    except Exception as e:
+        logger.error(f"Model selection info failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get model selection info: {str(e)}") 
