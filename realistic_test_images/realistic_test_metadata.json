@@ -1,0 +1,42 @@
+{
+  "real_samples": {
+    "real_original": {
+      "path": "realistic_test_images/real_original.jpg",
+      "expected": false,
+      "description": "Original real image (Elon Musk)",
+      "category": "real"
+    }
+  },
+  "fake_samples": {
+    "fake_faceswap": {
+      "path": "realistic_test_images/fake_faceswap.jpg",
+      "expected": true,
+      "description": "Face-swap simulation with color inconsistencies",
+      "category": "fake"
+    },
+    "fake_frequency": {
+      "path": "realistic_test_images/fake_frequency.jpg",
+      "expected": true,
+      "description": "Frequency domain artifacts and noise",
+      "category": "fake"
+    },
+    "fake_compression": {
+      "path": "realistic_test_images/fake_compression.jpg",
+      "expected": true,
+      "description": "Heavy compression artifacts",
+      "category": "fake"
+    },
+    "fake_lighting": {
+      "path": "realistic_test_images/fake_lighting.jpg",
+      "expected": true,
+      "description": "Uneven lighting and color shifts",
+      "category": "fake"
+    },
+    "fake_edges": {
+      "path": "realistic_test_images/fake_edges.jpg",
+      "expected": true,
+      "description": "Edge artifacts and boundary inconsistencies",
+      "category": "fake"
+    }
+  }
+}

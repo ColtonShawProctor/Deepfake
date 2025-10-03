@@ -273,7 +273,7 @@ const SpatialFrequencyComparison = ({
             <div className="text-2xl font-bold text-blue-600">
               {spatialAnalysis ? `${spatialAnalysis.confidence.toFixed(1)}%` : '--'}
             </div>
-            <div className="text-sm text-slate-600">Confidence</div>
+            <div className="text-sm text-slate-600">Confidence ({spatialAnalysis?.consensus > 0.5 ? 'FAKE' : 'REAL'})</div>
           </div>
         </div>
 
@@ -352,7 +352,7 @@ const SpatialFrequencyComparison = ({
             <div className="text-2xl font-bold text-purple-600">
               {frequencyAnalysis ? `${frequencyAnalysis.confidence.toFixed(1)}%` : '--'}
             </div>
-            <div className="text-sm text-slate-600">Confidence</div>
+            <div className="text-sm text-slate-600">Confidence ({frequencyAnalysis?.consensus > 0.5 ? 'FAKE' : 'REAL'})</div>
           </div>
         </div>
 

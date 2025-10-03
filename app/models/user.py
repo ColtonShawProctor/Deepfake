@@ -1,13 +1,16 @@
 from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from app.database import Base
-import hashlib
-import secrets
+from passlib.context import CryptContext
 from datetime import datetime
+
+# Password hashing context (same as auth.py)
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class User(Base):
     """User model for authentication and user management"""
     __tablename__ = "users"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(100), unique=True, index=True, nullable=False)
@@ -23,16 +26,17 @@ class User(Base):
 
     @staticmethod
     def hash_password(password: str) -> str:
-        """Hash password using SHA-256"""
-        return hashlib.sha256(password.encode()).hexdigest()
+        """Hash password using bcrypt (same as auth.py)"""
+        return pwd_context.hash(password)
 
     def verify_password(self, password: str) -> bool:
-        """Verify password against stored hash"""
-        return self.password_hash == self.hash_password(password)
+        """Verify password against stored hash using bcrypt"""
+        return pwd_context.verify(password, self.password_hash)
 
     @staticmethod
     def create_token() -> str:
         """Create a random token for authentication"""
+        import secrets
         return secrets.token_urlsafe(32)
 
     def to_dict(self) -> dict:

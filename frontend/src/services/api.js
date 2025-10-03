@@ -3,21 +3,10 @@ import { getApiConfig } from '../config/api';
 import requestThrottle from '../utils/requestThrottle';
 
 // Get API configuration
-const config = getApiConfig() || {
-  BASE_URL: 'http://localhost:8000',
-  TIMEOUT: 300000, // Default timeout
-  TIMEOUTS: {
-    DEFAULT: 30000,
-    IMAGE_ANALYSIS: 60000,
-    VIDEO_ANALYSIS: 300000,
-    UPLOAD: 600000
-  },
-  AUTH: {
-    TOKEN_KEY: 'token',
-    USER_KEY: 'user'
-  }
-};
+const config = getApiConfig();
 console.log('API Config loaded:', config);
+console.log('Token key:', config?.AUTH?.TOKEN_KEY);
+console.log('User key:', config?.AUTH?.USER_KEY);
 
 // Create axios instance with base configuration
 const api = axios.create({
@@ -33,7 +22,7 @@ const api = axios.create({
 // Request interceptor to add auth token to all requests
 api.interceptors.request.use(
   (requestConfig) => {
-    const token = localStorage.getItem(config.AUTH.TOKEN_KEY);
+    const token = localStorage.getItem('token');
     if (token) {
       requestConfig.headers.Authorization = `Bearer ${token}`;
     }
@@ -60,10 +49,17 @@ api.interceptors.response.use(
       
       switch (status) {
         case 401:
-          // Unauthorized - clear token and redirect to login
-          localStorage.removeItem(config.AUTH.TOKEN_KEY);
-          localStorage.removeItem(config.AUTH.USER_KEY);
-          window.location.href = '/login';
+          // Only clear token and redirect if it's not a login/register request
+          // This prevents infinite redirect loops during authentication
+          const isAuthRequest = error.config?.url?.includes('/auth/login') || 
+                               error.config?.url?.includes('/auth/register');
+          
+          if (!isAuthRequest) {
+            // Unauthorized - clear token and redirect to login
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+          }
           break;
         case 403:
           console.error('Access forbidden:', data);
@@ -104,8 +100,15 @@ export const authAPI = {
       
       // Store token and user data if registration includes auto-login
       if (response.data.access_token) {
-        localStorage.setItem(config.AUTH.TOKEN_KEY, response.data.access_token);
-        localStorage.setItem(config.AUTH.USER_KEY, JSON.stringify(response.data.user));
+        // Store token directly in localStorage for consistency
+        localStorage.setItem('token', response.data.access_token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        
+        // Verify token was stored
+        const storedToken = localStorage.getItem('token');
+        if (!storedToken) {
+          throw new Error('Token storage failed');
+        }
       }
       
       return response.data;
@@ -130,8 +133,24 @@ export const authAPI = {
       
       // Store token and user data
       if (response.data.access_token) {
-        localStorage.setItem(config.AUTH.TOKEN_KEY, response.data.access_token);
-        localStorage.setItem(config.AUTH.USER_KEY, JSON.stringify(response.data.user));
+        console.log('Storing token:', response.data.access_token.substring(0, 20) + '...');
+        console.log('Storing user:', response.data.user);
+        
+        // Store token directly in localStorage for consistency
+        localStorage.setItem('token', response.data.access_token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        
+        // Verify token was stored
+        const storedToken = localStorage.getItem('token');
+        console.log('Token stored successfully:', storedToken ? 'Yes' : 'No');
+        console.log('Stored token value:', storedToken ? storedToken.substring(0, 20) + '...' : 'None');
+        
+        if (!storedToken) {
+          throw new Error('Token storage failed');
+        }
+      } else {
+        console.error('No access_token in response:', response.data);
+        throw new Error('No access token received');
       }
       
       return response.data;
@@ -168,8 +187,8 @@ export const authAPI = {
   refreshToken: async () => {
     try {
       const response = await api.post('/auth/refresh');
-      if (response.data.token) {
-        localStorage.setItem(config.AUTH.TOKEN_KEY, response.data.token);
+      if (response.data.access_token) {
+        localStorage.setItem('token', response.data.access_token);
       }
       return response.data;
     } catch (error) {
@@ -288,41 +307,23 @@ export const analysisAPI = {
     
     return requestThrottle.throttle(requestKey, async () => {
       try {
-        // Try multiple endpoints to find the right one
-        try {
-          // First try the detection router endpoint
-          const response = await api.get(`/api/detection/results/${fileId}`);
-          return response.data;
-        } catch (detectionError) {
-          console.log('Detection endpoint failed, trying analysis endpoint...');
-          // Try the analysis router endpoint
-          const response = await api.get(`/api/analysis/results/${fileId}`);
-          return response.data;
-        }
+        // Use the detection router endpoint consistently
+        const response = await api.get(`/api/detection/results/${fileId}`);
+        return response.data;
       } catch (error) {
         throw error;
       }
     });
   },
 
-  // Get all user's analysis results
+    // Get all user's analysis results
   getAllResults: async (page = 1, limit = 10) => {
     try {
-      // Try multiple endpoints to find the right one
-      try {
-        // First try the analysis router endpoint
-        const response = await api.get('/api/analysis/history', {
-          params: { page, limit }
-        });
-        return response.data;
-              } catch (analysisError) {
-          console.log('Analysis history endpoint failed, trying detection endpoint...');
-          // Try the detection router endpoint
-          const response = await api.get('/api/detection/results', {
-            params: { page, limit }
-          });
-          return response.data;
-        }
+      // Use the detection router endpoint consistently
+      const response = await api.get('/api/detection/results', {
+        params: { page, limit }
+      });
+      return response.data;
     } catch (error) {
       throw error;
     }
@@ -430,24 +431,24 @@ export const userAPI = {
 export const apiUtils = {
   // Check if user is authenticated
   isAuthenticated: () => {
-    return !!localStorage.getItem(config.AUTH.TOKEN_KEY);
+    return !!localStorage.getItem('token');
   },
 
   // Get stored token
   getToken: () => {
-    return localStorage.getItem(config.AUTH.TOKEN_KEY);
+    return localStorage.getItem('token');
   },
 
   // Get stored user data
   getUser: () => {
-    const user = localStorage.getItem(config.AUTH.USER_KEY);
+    const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
   },
 
   // Clear all stored data
   clearAuth: () => {
-    localStorage.removeItem(config.AUTH.TOKEN_KEY);
-    localStorage.removeItem(config.AUTH.USER_KEY);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
   },
 
   // Handle API errors with user-friendly messages

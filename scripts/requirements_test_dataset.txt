@@ -1,0 +1,19 @@
+# Requirements for Test Dataset Creation Script
+# Install with: pip install -r requirements_test_dataset.txt
+
+# Core dependencies
+requests>=2.28.0
+Pillow>=9.0.0
+numpy>=1.21.0
+opencv-python>=4.5.0
+
+# Optional: For better image processing
+scikit-image>=0.19.0
+
+# Optional: For additional video processing
+ffmpeg-python>=0.2.0
+
+
+
+
+

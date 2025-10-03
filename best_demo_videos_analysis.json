@@ -1,0 +1,242 @@
+{
+  "timestamp": "2024-12-19",
+  "total_videos": 19,
+  "best_demo_videos": {
+    "fake": [
+      {
+        "id": 81,
+        "media_file_id": 100,
+        "confidence_score": 0.9898799955844879,
+        "confidence_percent": 98.98799955844879,
+        "is_deepfake": 1,
+        "model_name": "huggingface_detector",
+        "filename": "id0_id16_0002.mp4",
+        "file_path": "uploads/videos/cc6a3fd2-5368-4500-9728-40676a1debe7.mp4"
+      },
+      {
+        "id": 78,
+        "media_file_id": 97,
+        "confidence_score": 0.983912605047226,
+        "confidence_percent": 98.3912605047226,
+        "is_deepfake": 1,
+        "model_name": "huggingface_detector",
+        "filename": "id0_0002.mp4",
+        "file_path": "uploads/videos/f62b2bac-bd76-4dbe-89b6-5618f5e1ae58.mp4"
+      },
+      {
+        "id": 79,
+        "media_file_id": 98,
+        "confidence_score": 0.9537589658390392,
+        "confidence_percent": 95.37589658390392,
+        "is_deepfake": 1,
+        "model_name": "huggingface_detector",
+        "filename": "id0_id16_0000.mp4",
+        "file_path": "uploads/videos/8d92e0c5-cd7e-4c2c-9e82-e100b371bc1d.mp4"
+      }
+    ],
+    "real": [
+      {
+        "id": 74,
+        "media_file_id": 93,
+        "confidence_score": 0.0,
+        "confidence_percent": 0.0,
+        "is_deepfake": 0,
+        "model_name": "huggingface_detector",
+        "filename": "fake_02_id59_0000.mp4",
+        "file_path": "uploads/videos/67dc2923-8c80-41ba-b868-6f1d865ae152.mp4"
+      }
+    ]
+  },
+  "all_videos": [
+    {
+      "id": 81,
+      "media_file_id": 100,
+      "confidence_score": 0.9898799955844879,
+      "confidence_percent": 98.98799955844879,
+      "is_deepfake": 1,
+      "model_name": "huggingface_detector",
+      "filename": "id0_id16_0002.mp4",
+      "file_path": "uploads/videos/cc6a3fd2-5368-4500-9728-40676a1debe7.mp4"
+    },
+    {
+      "id": 78,
+      "media_file_id": 97,
+      "confidence_score": 0.983912605047226,
+      "confidence_percent": 98.3912605047226,
+      "is_deepfake": 1,
+      "model_name": "huggingface_detector",
+      "filename": "id0_0002.mp4",
+      "file_path": "uploads/videos/f62b2bac-bd76-4dbe-89b6-5618f5e1ae58.mp4"
+    },
+    {
+      "id": 79,
+      "media_file_id": 98,
+      "confidence_score": 0.9537589658390392,
+      "confidence_percent": 95.37589658390392,
+      "is_deepfake": 1,
+      "model_name": "huggingface_detector",
+      "filename": "id0_id16_0000.mp4",
+      "file_path": "uploads/videos/8d92e0c5-cd7e-4c2c-9e82-e100b371bc1d.mp4"
+    },
+    {
+      "id": 76,
+      "media_file_id": 95,
+      "confidence_score": 0.9438735138286244,
+      "confidence_percent": 94.38735138286243,
+      "is_deepfake": 1,
+      "model_name": "huggingface_detector",
+      "filename": "id0_0000.mp4",
+      "file_path": "uploads/videos/d7959bae-3a8c-4b14-a585-46394305e551.mp4"
+    },
+    {
+      "id": 63,
+      "media_file_id": 83,
+      "confidence_score": 0.9363863413984125,
+      "confidence_percent": 93.63863413984124,
+      "is_deepfake": 1,
+      "model_name": "huggingface_detector",
+      "filename": "id5_0000.mp4",
+      "file_path": "uploads/videos/9f1ed603-c40a-49ea-a5a5-f79e1dcd0080.mp4"
+    },
+    {
+      "id": 72,
+      "media_file_id": 92,
+      "confidence_score": 0.9363717924464833,
+      "confidence_percent": 93.63717924464832,
+      "is_deepfake": 1,
+      "model_name": "huggingface_detector",
+      "filename": "fake_01_id5_0000.mp4",
+      "file_path": "uploads/videos/edd6e88a-b534-4a7e-adb5-7571cbb8ddea.mp4"
+    },
+    {
+      "id": 73,
+      "media_file_id": 93,
+      "confidence_score": 0.9361118294975974,
+      "confidence_percent": 93.61118294975974,
+      "is_deepfake": 1,
+      "model_name": "huggingface_detector",
+      "filename": "fake_02_id59_0000.mp4",
+      "file_path": "uploads/videos/67dc2923-8c80-41ba-b868-6f1d865ae152.mp4"
+    },
+    {
+      "id": 64,
+      "media_file_id": 84,
+      "confidence_score": 0.9360462156209078,
+      "confidence_percent": 93.60462156209078,
+      "is_deepfake": 1,
+      "model_name": "huggingface_detector",
+      "filename": "id59_0000.mp4",
+      "file_path": "uploads/videos/6a4339f9-86a0-428d-89cf-c0ddbb885e41.mp4"
+    },
+    {
+      "id": 71,
+      "media_file_id": 91,
+      "confidence_score": 0.9356111233884638,
+      "confidence_percent": 93.56111233884637,
+      "is_deepfake": 1,
+      "model_name": "huggingface_detector",
+      "filename": "fake_02_id59_0000.mp4",
+      "file_path": "uploads/videos/10c198c9-f16a-45f8-b909-3043a0f48b13.mp4"
+    },
+    {
+      "id": 70,
+      "media_file_id": 90,
+      "confidence_score": 0.9313847693529996,
+      "confidence_percent": 93.13847693529996,
+      "is_deepfake": 1,
+      "model_name": "huggingface_detector",
+      "filename": "id59_id5_0000.mp4",
+      "file_path": "uploads/videos/1d10feeb-7d90-48c0-90e2-2f0317e0c97a.mp4"
+    },
+    {
+      "id": 69,
+      "media_file_id": 89,
+      "confidence_score": 0.9228566939180548,
+      "confidence_percent": 92.28566939180548,
+      "is_deepfake": 1,
+      "model_name": "huggingface_detector",
+      "filename": "id60_id59_0000.mp4",
+      "file_path": "uploads/videos/ca2a4050-1e64-4c79-a702-c0c07d7a63de.mp4"
+    },
+    {
+      "id": 67,
+      "media_file_id": 87,
+      "confidence_score": 0.9188254714012146,
+      "confidence_percent": 91.88254714012146,
+      "is_deepfake": 1,
+      "model_name": "huggingface_detector",
+      "filename": "id59_id61_0000.mp4",
+      "file_path": "uploads/videos/db6ffc7d-a8cf-4abf-8db4-dd07d541aa47.mp4"
+    },
+    {
+      "id": 68,
+      "media_file_id": 88,
+      "confidence_score": 0.9128287922252308,
+      "confidence_percent": 91.28287922252308,
+      "is_deepfake": 1,
+      "model_name": "huggingface_detector",
+      "filename": "id5_id61_0008.mp4",
+      "file_path": "uploads/videos/7ab294a7-9159-4012-89b1-ca55d47196a9.mp4"
+    },
+    {
+      "id": 65,
+      "media_file_id": 85,
+      "confidence_score": 0.9041201526468451,
+      "confidence_percent": 90.41201526468451,
+      "is_deepfake": 1,
+      "model_name": "huggingface_detector",
+      "filename": "id60_0000.mp4",
+      "file_path": "uploads/videos/6014d8de-71e1-4074-9abb-a3a0a715436e.mp4"
+    },
+    {
+      "id": 80,
+      "media_file_id": 99,
+      "confidence_score": 0.8145332715728066,
+      "confidence_percent": 81.45332715728067,
+      "is_deepfake": 1,
+      "model_name": "huggingface_detector",
+      "filename": "id0_id16_0001.mp4",
+      "file_path": "uploads/videos/0e001a1b-54cb-4f1d-9279-38f0443543ae.mp4"
+    },
+    {
+      "id": 77,
+      "media_file_id": 96,
+      "confidence_score": 0.7354264584454623,
+      "confidence_percent": 73.54264584454623,
+      "is_deepfake": 1,
+      "model_name": "huggingface_detector",
+      "filename": "id0_0001.mp4",
+      "file_path": "uploads/videos/7a121f8a-c625-421c-9404-2a656979c6a6.mp4"
+    },
+    {
+      "id": 75,
+      "media_file_id": 94,
+      "confidence_score": 0.606782241301103,
+      "confidence_percent": 60.6782241301103,
+      "is_deepfake": 1,
+      "model_name": "huggingface_detector",
+      "filename": "real_02_00250.mp4",
+      "file_path": "uploads/videos/6906abdb-9162-40e2-9264-491adb6885b1.mp4"
+    },
+    {
+      "id": 66,
+      "media_file_id": 86,
+      "confidence_score": 0.6064640446142717,
+      "confidence_percent": 60.646404461427174,
+      "is_deepfake": 1,
+      "model_name": "huggingface_detector",
+      "filename": "00250.mp4",
+      "file_path": "uploads/videos/8e00e2af-e329-4f57-ad5e-0969f0dcde78.mp4"
+    },
+    {
+      "id": 74,
+      "media_file_id": 93,
+      "confidence_score": 0.0,
+      "confidence_percent": 0.0,
+      "is_deepfake": 0,
+      "model_name": "huggingface_detector",
+      "filename": "fake_02_id59_0000.mp4",
+      "file_path": "uploads/videos/67dc2923-8c80-41ba-b868-6f1d865ae152.mp4"
+    }
+  ]
+}

@@ -1,15 +1,22 @@
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, MetaData
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import SQLAlchemyError
 import os
 from pathlib import Path
 
+# Get the absolute path to the project root directory
+PROJECT_ROOT = Path(__file__).parent.parent.absolute()
+DATABASE_PATH = PROJECT_ROOT / "deepfake.db"
+
 # Database configuration
-DATABASE_URL = "sqlite:///./deepfake.db"
+DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+
+# Create metadata with extend_existing to prevent table conflicts
+metadata = MetaData()
+Base = declarative_base(metadata=metadata)
 
 def get_db():
     """Dependency to get database session"""
@@ -27,8 +34,8 @@ def init_database():
         from app.models.media_file import MediaFile
         from app.models.detection_result import DetectionResult
         
-        # Create tables
-        Base.metadata.create_all(bind=engine)
+        # Create tables with extend_existing to prevent conflicts
+        Base.metadata.create_all(bind=engine, checkfirst=True)
         print("✅ Database initialized successfully")
     except Exception as e:
         print(f"❌ Database initialization failed: {e}")

@@ -1,0 +1,110 @@
+[
+  {
+    "path": "test_data/fake/images/synthetic_hf_face.jpg",
+    "filename": "synthetic_hf_face.jpg",
+    "expected_type": "fake",
+    "predicted_type": "FAKE",
+    "confidence": 0.5570806264877319,
+    "processing_time": 0.0784907341003418,
+    "correct": true
+  },
+  {
+    "path": "test_data/fake/images/ai_generated_face.jpg",
+    "filename": "ai_generated_face.jpg",
+    "expected_type": "fake",
+    "predicted_type": "FAKE",
+    "confidence": 0.7351741790771484,
+    "processing_time": 0.12920284271240234,
+    "correct": true
+  },
+  {
+    "path": "test_data/fake/images/deepfake_face_1.jpg",
+    "filename": "deepfake_face_1.jpg",
+    "expected_type": "fake",
+    "predicted_type": "FAKE",
+    "confidence": 0.5261512398719788,
+    "processing_time": 0.12144637107849121,
+    "correct": true
+  },
+  {
+    "path": "test_data/fake/images/deepfake_face_2.jpg",
+    "filename": "deepfake_face_2.jpg",
+    "expected_type": "fake",
+    "predicted_type": "FAKE",
+    "confidence": 0.617901623249054,
+    "processing_time": 0.12830424308776855,
+    "correct": true
+  },
+  {
+    "path": "test_data/real/images/real_celebrity_1.jpg",
+    "filename": "real_celebrity_1.jpg",
+    "expected_type": "real",
+    "predicted_type": "REAL",
+    "confidence": 0.7169545888900757,
+    "processing_time": 0.12082695960998535,
+    "correct": true
+  },
+  {
+    "path": "test_data/real/images/synthetic_natural_face.jpg",
+    "filename": "synthetic_natural_face.jpg",
+    "expected_type": "real",
+    "predicted_type": "FAKE",
+    "confidence": 0.5837769508361816,
+    "processing_time": 0.12561798095703125,
+    "correct": false
+  },
+  {
+    "path": "realistic_test_images/fake_edges.jpg",
+    "filename": "fake_edges.jpg",
+    "expected_type": "fake",
+    "predicted_type": "REAL",
+    "confidence": 0.8139980435371399,
+    "processing_time": 0.11983203887939453,
+    "correct": false
+  },
+  {
+    "path": "realistic_test_images/fake_lighting.jpg",
+    "filename": "fake_lighting.jpg",
+    "expected_type": "fake",
+    "predicted_type": "REAL",
+    "confidence": 0.8048888444900513,
+    "processing_time": 0.11028790473937988,
+    "correct": false
+  },
+  {
+    "path": "realistic_test_images/fake_compression.jpg",
+    "filename": "fake_compression.jpg",
+    "expected_type": "fake",
+    "predicted_type": "REAL",
+    "confidence": 0.9309134483337402,
+    "processing_time": 0.12265610694885254,
+    "correct": false
+  },
+  {
+    "path": "realistic_test_images/fake_frequency.jpg",
+    "filename": "fake_frequency.jpg",
+    "expected_type": "fake",
+    "predicted_type": "REAL",
+    "confidence": 0.6939091682434082,
+    "processing_time": 0.12136197090148926,
+    "correct": false
+  },
+  {
+    "path": "realistic_test_images/fake_faceswap.jpg",
+    "filename": "fake_faceswap.jpg",
+    "expected_type": "fake",
+    "predicted_type": "REAL",
+    "confidence": 0.9000925421714783,
+    "processing_time": 0.12335991859436035,
+    "correct": false
+  },
+  {
+    "path": "realistic_test_images/real_original.jpg",
+    "filename": "real_original.jpg",
+    "expected_type": "real",
+    "predicted_type": "REAL",
+    "confidence": 0.7572172284126282,
+    "processing_time": 0.10589432716369629,
+    "correct": true
+  }
+]

@@ -5,8 +5,9 @@ from datetime import datetime
 import json
 
 class DetectionResult(Base):
-    """DetectionResult model for storing deepfake detection results"""
+    """Deepfake detection result model"""
     __tablename__ = "detection_results"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     media_file_id = Column(Integer, ForeignKey("media_files.id"), nullable=False)

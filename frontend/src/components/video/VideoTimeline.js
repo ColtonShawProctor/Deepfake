@@ -165,7 +165,7 @@ const VideoTimeline = ({
                   left: `${position}%`,
                   backgroundColor: getConfidenceColor(confidence)
                 }}
-                title={`Frame ${frameAnalysis.frame_number}: ${(confidence * 100).toFixed(1)}% confidence`}
+                title={`Frame ${frameAnalysis.frame_number}: ${(confidence * 100).toFixed(1)}% confidence (${frameAnalysis.is_deepfake ? 'FAKE' : 'REAL'})`}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (onFrameSelect) {
@@ -179,7 +179,7 @@ const VideoTimeline = ({
                 <div className="frame-tooltip">
                   <div>Frame {frameAnalysis.frame_number}</div>
                   <div>Time: {formatTime(frameTime)}</div>
-                  <div>Confidence: {(confidence * 100).toFixed(1)}%</div>
+                  <div>Confidence: {(confidence * 100).toFixed(1)}% ({frameAnalysis.is_deepfake ? 'FAKE' : 'REAL'})</div>
                   <div>Result: {frameAnalysis.is_deepfake ? 'Deepfake' : 'Real'}</div>
                 </div>
               </div>
@@ -218,7 +218,7 @@ const VideoTimeline = ({
                     ></div>
                   </div>
                   <div className="confidence-text">
-                    Confidence: {(analysis.confidence_score * 100).toFixed(1)}%
+                    Confidence: {(analysis.confidence_score * 100).toFixed(1)}% ({analysis.is_deepfake ? 'FAKE' : 'REAL'})
                   </div>
                   <div className={`result-badge ${analysis.is_deepfake ? 'deepfake' : 'real'}`}>
                     {analysis.is_deepfake ? 'Deepfake Detected' : 'Real'}

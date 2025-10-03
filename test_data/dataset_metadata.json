@@ -1,0 +1,184 @@
+{
+  "dataset_info": {
+    "name": "Deepfake Detection Test Dataset",
+    "description": "Test dataset for demonstrating deepfake detection capabilities",
+    "created": "2025-08-13 19:13:38",
+    "total_samples": 10,
+    "categories": {
+      "real": 4,
+      "fake": 6
+    },
+    "note": "Some video files are placeholders. Replace with actual video files for full testing."
+  },
+  "samples": {
+    "real_celebrity_1": {
+      "path": "test_data/real/images/real_celebrity_1.jpg",
+      "expected": false,
+      "description": "Real celebrity photo - Elon Musk",
+      "source": "Wikipedia Commons",
+      "category": "real",
+      "file_type": "image"
+    },
+    "real_video_1": {
+      "path": "test_data/real/videos/real_video_1.txt",
+      "expected": false,
+      "description": "Placeholder for real video 1",
+      "source": "Placeholder",
+      "category": "real",
+      "file_type": "video",
+      "is_placeholder": true
+    },
+    "real_video_2": {
+      "path": "test_data/real/videos/real_video_2.txt",
+      "expected": false,
+      "description": "Placeholder for real video 2",
+      "source": "Placeholder",
+      "category": "real",
+      "file_type": "video",
+      "is_placeholder": true
+    },
+    "deepfake_face_1": {
+      "path": "test_data/fake/images/deepfake_face_1.jpg",
+      "expected": true,
+      "description": "Synthetic deepfake with artifacts",
+      "source": "Generated",
+      "category": "fake",
+      "file_type": "image",
+      "artifact_type": "high_frequency"
+    },
+    "deepfake_face_2": {
+      "path": "test_data/fake/images/deepfake_face_2.jpg",
+      "expected": true,
+      "description": "Synthetic deepfake with compression",
+      "source": "Generated",
+      "category": "fake",
+      "file_type": "image",
+      "artifact_type": "compression"
+    },
+    "ai_generated_face": {
+      "path": "test_data/fake/images/ai_generated_face.jpg",
+      "expected": true,
+      "description": "AI-generated face (StyleGAN-like)",
+      "source": "Generated",
+      "category": "fake",
+      "file_type": "image",
+      "artifact_type": "ai_generation"
+    },
+    "fake_video_1": {
+      "path": "test_data/fake/videos/fake_video_1.txt",
+      "expected": true,
+      "description": "Placeholder for fake video 1",
+      "source": "Placeholder",
+      "category": "fake",
+      "file_type": "video",
+      "is_placeholder": true
+    },
+    "fake_video_2": {
+      "path": "test_data/fake/videos/fake_video_2.txt",
+      "expected": true,
+      "description": "Placeholder for fake video 2",
+      "source": "Placeholder",
+      "category": "fake",
+      "file_type": "video",
+      "is_placeholder": true
+    },
+    "synthetic_natural_face": {
+      "path": "test_data/real/images/synthetic_natural_face.jpg",
+      "expected": false,
+      "description": "Synthetic natural-looking face",
+      "source": "Generated",
+      "category": "real",
+      "file_type": "image"
+    },
+    "synthetic_hf_face": {
+      "path": "test_data/fake/images/synthetic_hf_face.jpg",
+      "expected": true,
+      "description": "Synthetic face with high-frequency artifacts",
+      "source": "Generated",
+      "category": "fake",
+      "file_type": "image"
+    }
+  },
+  "expected_results": {
+    "real_celebrity_1": {
+      "expected_classification": "REAL",
+      "expected_confidence": {
+        "min": 0.8,
+        "max": 0.98
+      },
+      "notes": "Should be classified as REAL based on Real celebrity photo - Elon Musk"
+    },
+    "real_video_1": {
+      "expected_classification": "REAL",
+      "expected_confidence": {
+        "min": 0.8,
+        "max": 0.98
+      },
+      "notes": "Should be classified as REAL based on Placeholder for real video 1"
+    },
+    "real_video_2": {
+      "expected_classification": "REAL",
+      "expected_confidence": {
+        "min": 0.8,
+        "max": 0.98
+      },
+      "notes": "Should be classified as REAL based on Placeholder for real video 2"
+    },
+    "deepfake_face_1": {
+      "expected_classification": "FAKE",
+      "expected_confidence": {
+        "min": 0.7,
+        "max": 0.95
+      },
+      "notes": "Should be classified as FAKE based on Synthetic deepfake with artifacts"
+    },
+    "deepfake_face_2": {
+      "expected_classification": "FAKE",
+      "expected_confidence": {
+        "min": 0.7,
+        "max": 0.95
+      },
+      "notes": "Should be classified as FAKE based on Synthetic deepfake with compression"
+    },
+    "ai_generated_face": {
+      "expected_classification": "FAKE",
+      "expected_confidence": {
+        "min": 0.7,
+        "max": 0.95
+      },
+      "notes": "Should be classified as FAKE based on AI-generated face (StyleGAN-like)"
+    },
+    "fake_video_1": {
+      "expected_classification": "FAKE",
+      "expected_confidence": {
+        "min": 0.7,
+        "max": 0.95
+      },
+      "notes": "Should be classified as FAKE based on Placeholder for fake video 1"
+    },
+    "fake_video_2": {
+      "expected_classification": "FAKE",
+      "expected_confidence": {
+        "min": 0.7,
+        "max": 0.95
+      },
+      "notes": "Should be classified as FAKE based on Placeholder for fake video 2"
+    },
+    "synthetic_natural_face": {
+      "expected_classification": "REAL",
+      "expected_confidence": {
+        "min": 0.8,
+        "max": 0.98
+      },
+      "notes": "Should be classified as REAL based on Synthetic natural-looking face"
+    },
+    "synthetic_hf_face": {
+      "expected_classification": "FAKE",
+      "expected_confidence": {
+        "min": 0.7,
+        "max": 0.95
+      },
+      "notes": "Should be classified as FAKE based on Synthetic face with high-frequency artifacts"
+    }
+  }
+}

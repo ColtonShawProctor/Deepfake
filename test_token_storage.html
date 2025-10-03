@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Token Storage Test</title>
+</head>
+<body>
+    <h1>Token Storage Test</h1>
+    <div id="status"></div>
+    <button onclick="testLogin()">Test Login</button>
+    <button onclick="checkStorage()">Check Storage</button>
+    <button onclick="clearStorage()">Clear Storage</button>
+    
+    <script>
+        const config = {
+            AUTH: {
+                TOKEN_KEY: 'token',
+                USER_KEY: 'user'
+            }
+        };
+        
+        async function testLogin() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = 'Testing login...';
+            
+            try {
+                // Test with the working credentials
+                const formData = new URLSearchParams();
+                formData.append('username', 'test@test.com');
+                formData.append('password', 'test1234');
+                
+                const response = await fetch('http://localhost:8000/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Login response:', data);
+                    
+                    // Store token and user data (same as frontend)
+                    if (data.access_token) {
+                        localStorage.setItem(config.AUTH.TOKEN_KEY, data.access_token);
+                        localStorage.setItem(config.AUTH.USER_KEY, JSON.stringify(data.user));
+                        statusDiv.innerHTML = '✅ Login successful! Token stored.';
+                        console.log('Token stored:', data.access_token);
+                        console.log('User stored:', data.user);
+                    } else {
+                        statusDiv.innerHTML = '❌ No access_token in response';
+                    }
+                } else {
+                    const errorText = await response.text();
+                    statusDiv.innerHTML = `❌ Login failed: ${response.status} - ${errorText}`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `❌ Error: ${error.message}`;
+                console.error('Login error:', error);
+            }
+        }
+        
+        function checkStorage() {
+            const statusDiv = document.getElementById('status');
+            const token = localStorage.getItem(config.AUTH.TOKEN_KEY);
+            const user = localStorage.getItem(config.AUTH.USER_KEY);
+            
+            if (token) {
+                statusDiv.innerHTML = `✅ Token found: ${token.substring(0, 20)}...<br>User: ${user}`;
+                console.log('Stored token:', token);
+                console.log('Stored user:', user);
+            } else {
+                statusDiv.innerHTML = '❌ No token found in storage';
+            }
+        }
+        
+        function clearStorage() {
+            localStorage.removeItem(config.AUTH.TOKEN_KEY);
+            localStorage.removeItem(config.AUTH.USER_KEY);
+            document.getElementById('status').innerHTML = '✅ Storage cleared';
+        }
+        
+        // Check storage on page load
+        window.onload = function() {
+            checkStorage();
+        };
+    </script>
+</body>
+</html>

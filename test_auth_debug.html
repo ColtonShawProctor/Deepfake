@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .debug-output { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 3px; font-family: monospace; }
+        button { padding: 10px 15px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        input { padding: 8px; margin: 5px; border: 1px solid #ccc; border-radius: 3px; width: 200px; }
+    </style>
+</head>
+<body>
+    <h1>Authentication Debug Test</h1>
+    
+    <div class="debug-section">
+        <h3>Local Storage Status</h3>
+        <button onclick="checkLocalStorage()">Check Local Storage</button>
+        <button onclick="clearLocalStorage()">Clear Local Storage</button>
+        <div id="localStorageOutput" class="debug-output"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h3>Test Login</h3>
+        <input type="email" id="emailInput" placeholder="Email" value="demo@example.com">
+        <input type="password" id="passwordInput" placeholder="Password" value="password123">
+        <button onclick="testLogin()">Test Login</button>
+        <div id="loginOutput" class="debug-output"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h3>Test API Call</h3>
+        <button onclick="testApiCall()">Test /auth/me</button>
+        <div id="apiOutput" class="debug-output"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h3>Token Validation</h3>
+        <button onclick="validateToken()">Validate Stored Token</button>
+        <div id="tokenOutput" class="debug-output"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        
+        function log(elementId, message) {
+            const element = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            element.innerHTML += `[${timestamp}] ${message}\n`;
+            element.scrollTop = element.scrollHeight;
+        }
+        
+        function checkLocalStorage() {
+            const output = document.getElementById('localStorageOutput');
+            output.innerHTML = '';
+            
+            const token = localStorage.getItem('token');
+            const user = localStorage.getItem('user');
+            
+            log('localStorageOutput', `Token: ${token ? 'Present' : 'Missing'}`);
+            if (token) {
+                log('localStorageOutput', `Token preview: ${token.substring(0, 20)}...`);
+            }
+            
+            log('localStorageOutput', `User: ${user ? 'Present' : 'Missing'}`);
+            if (user) {
+                try {
+                    const userObj = JSON.parse(user);
+                    log('localStorageOutput', `User email: ${userObj.email}`);
+                } catch (e) {
+                    log('localStorageOutput', `Error parsing user data: ${e.message}`);
+                }
+            }
+        }
+        
+        function clearLocalStorage() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            log('localStorageOutput', 'Local storage cleared');
+        }
+        
+        async function testLogin() {
+            const output = document.getElementById('loginOutput');
+            output.innerHTML = '';
+            
+            const email = document.getElementById('emailInput').value;
+            const password = document.getElementById('passwordInput').value;
+            
+            log('loginOutput', `Attempting login with: ${email}`);
+            
+            try {
+                const formData = new URLSearchParams();
+                formData.append('username', email);
+                formData.append('password', password);
+                
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log('loginOutput', 'Login successful!');
+                    log('loginOutput', `Response: ${JSON.stringify(data, null, 2)}`);
+                    
+                    // Store token and user data
+                    if (data.access_token) {
+                        localStorage.setItem('token', data.access_token);
+                        localStorage.setItem('user', JSON.stringify(data.user));
+                        log('loginOutput', 'Token and user data stored in localStorage');
+                    }
+                } else {
+                    log('loginOutput', `Login failed: ${data.detail || 'Unknown error'}`);
+                }
+            } catch (error) {
+                log('loginOutput', `Error: ${error.message}`);
+            }
+        }
+        
+        async function testApiCall() {
+            const output = document.getElementById('apiOutput');
+            output.innerHTML = '';
+            
+            const token = localStorage.getItem('token');
+            if (!token) {
+                log('apiOutput', 'No token found in localStorage');
+                return;
+            }
+            
+            log('apiOutput', 'Testing /auth/me endpoint...');
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log('apiOutput', 'API call successful!');
+                    log('apiOutput', `User data: ${JSON.stringify(data, null, 2)}`);
+                } else {
+                    log('apiOutput', `API call failed: ${data.detail || 'Unknown error'}`);
+                }
+            } catch (error) {
+                log('apiOutput', `Error: ${error.message}`);
+            }
+        }
+        
+        async function validateToken() {
+            const output = document.getElementById('tokenOutput');
+            output.innerHTML = '';
+            
+            const token = localStorage.getItem('token');
+            if (!token) {
+                log('tokenOutput', 'No token found in localStorage');
+                return;
+            }
+            
+            log('tokenOutput', 'Validating stored token...');
+            
+            try {
+                // Try to decode JWT token (basic validation)
+                const parts = token.split('.');
+                if (parts.length !== 3) {
+                    log('tokenOutput', 'Invalid JWT format');
+                    return;
+                }
+                
+                const payload = JSON.parse(atob(parts[1]));
+                log('tokenOutput', 'Token payload:');
+                log('tokenOutput', `  Subject (user ID): ${payload.sub}`);
+                log('tokenOutput', `  Expires: ${new Date(payload.exp * 1000).toLocaleString()}`);
+                log('tokenOutput', `  Issued: ${new Date(payload.iat * 1000).toLocaleString()}`);
+                
+                // Check if token is expired
+                const now = Math.floor(Date.now() / 1000);
+                if (payload.exp < now) {
+                    log('tokenOutput', '⚠️ Token is expired!');
+                } else {
+                    log('tokenOutput', '✅ Token is valid and not expired');
+                }
+                
+            } catch (error) {
+                log('tokenOutput', `Error parsing token: ${error.message}`);
+            }
+        }
+        
+        // Auto-check localStorage on page load
+        window.onload = function() {
+            checkLocalStorage();
+        };
+    </script>
+</body>
+</html>

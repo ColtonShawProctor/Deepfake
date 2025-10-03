@@ -8,9 +8,17 @@ from app.detection_routes import router as detection_router
 from app.analysis_routes import router as analysis_router
 from app.video_routes import router as video_router
 
+# Import emergency detection routes
+try:
+    from app.emergency_detection_routes import router as emergency_detection_router
+    EMERGENCY_DETECTION_AVAILABLE = True
+except ImportError:
+    EMERGENCY_DETECTION_AVAILABLE = False
+    print("Warning: Emergency detection routes not available")
+
 # Import advanced ensemble routes
 try:
-    from app.api.advanced_ensemble_api import router as advanced_ensemble_router
+    from api.advanced_ensemble_api import router as advanced_ensemble_router
     ADVANCED_ENSEMBLE_AVAILABLE = True
 except ImportError:
     ADVANCED_ENSEMBLE_AVAILABLE = False
@@ -34,9 +42,15 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "*"  # Keep wildcard for other origins
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 

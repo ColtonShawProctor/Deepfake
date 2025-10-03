@@ -23,7 +23,7 @@ from app.models.user import User
 from app.models.media_file import MediaFile
 from app.models.detection_result import DetectionResult as DetectionResultModel
 from app.schemas import DetectionResponse
-from app.utils.deepfake_detector import DeepfakeDetector
+from app.models.huggingface_detector import HuggingFaceDetectorWrapper
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -31,8 +31,8 @@ logger = logging.getLogger(__name__)
 # Create router
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
-# Initialize detector
-detector = DeepfakeDetector()
+# Initialize Hugging Face detector (replaces broken EfficientNet)
+detector = HuggingFaceDetectorWrapper()
 
 @router.post("/analyze/{file_id}", response_model=Dict[str, Any])
 async def analyze_file(
@@ -70,49 +70,60 @@ async def analyze_file(
             detail="File not found on disk"
         )
     
-    # Check if analysis already completed
+    # Check if analysis already completed - but force fresh analysis for demo purposes
     existing_result = db.query(DetectionResultModel).filter(
         DetectionResultModel.media_file_id == file_id
     ).order_by(desc(DetectionResultModel.analysis_time)).first()
     
-    if existing_result:
+    # For demo purposes, always run fresh analysis to show current model performance
+    # In production, you might want to check if existing_result.model_name != "huggingface_detector"
+    if existing_result and existing_result.model_name == "huggingface_detector":
+        # Return existing result only if it's from the current model
+        # Convert confidence_score from 0-1 scale to 0-100 scale for frontend
+        confidence_percentage = existing_result.confidence_score * 100.0
         return {
-            "message": "Analysis already completed",
+            "message": "Analysis already completed with current model",
             "file_id": file_id,
             "status": "completed",
             "result_id": existing_result.id,
-            "confidence_score": existing_result.confidence_score,  # Already in 0-100 scale
+            "confidence_score": confidence_percentage,  # Convert to 0-100 scale
             "is_deepfake": existing_result.is_deepfake,
             "completed_at": existing_result.analysis_time.isoformat()
         }
     
     try:
         # Run analysis synchronously
-        logger.info(f"Starting analysis for file {file_id}")
+        logger.info(f"Starting FRESH analysis for file {file_id} with Hugging Face detector")
         
-        # Run analysis
-        detection_result = detector.analyze_image(str(file_path))
+        # Run analysis using the new Hugging Face detector
+        detection_result = detector.predict(str(file_path))
         
         # Store result in database
-        analysis_time = datetime.fromisoformat(detection_result["analysis_time"].replace('Z', '+00:00'))
+        analysis_time = datetime.utcnow()
         
         db_detection_result = DetectionResultModel(
             media_file_id=file_id,
-            confidence_score=detection_result["confidence_score"] / 100.0,  # Convert to 0-1 scale
+            confidence_score=detection_result["confidence"],  # Already in 0-1 scale
             is_deepfake=detection_result["is_deepfake"],
-            model_name=detection_result.get("model_name", "ensemble"),  # Default to ensemble
-            processing_time=detection_result.get("processing_time_seconds", 0.0),  # Default to 0.0
-            uncertainty=detection_result.get("uncertainty"),  # Optional field
-            attention_weights=json.dumps(detection_result.get("attention_weights", [])),  # Optional field
+            model_name=detection_result.get("model", "huggingface_detector"),
+            processing_time=detection_result.get("inference_time", 0.0),
+            uncertainty=None,  # Single model doesn't have ensemble uncertainty
+            attention_weights=None,  # Single model doesn't have ensemble weights
             analysis_time=analysis_time,
-            result_metadata=json.dumps(detection_result["analysis_metadata"])
+            result_metadata=json.dumps({
+                "method": detection_result.get("method", "huggingface_vit"),
+                "device": detection_result.get("device", "cpu"),
+                "input_size": detection_result.get("input_size", [224, 224]),
+                "predicted_class": detection_result.get("predicted_class", 0),
+                "probabilities": detection_result.get("probabilities", {})
+            })
         )
         
         db.add(db_detection_result)
         db.commit()
         db.refresh(db_detection_result)
         
-        logger.info(f"Analysis completed for file {file_id} with confidence {detection_result['confidence_score']}%")
+        logger.info(f"Analysis completed for file {file_id} with confidence {detection_result['confidence']}%")
         
         return {
             "success": True,
@@ -120,20 +131,20 @@ async def analyze_file(
             "file_id": file_id,
             "filename": media_file.filename,
             "detection_result": {
-                "confidence_score": detection_result.confidence_score,  # Already in 0-100 scale
-                "is_deepfake": detection_result.is_deepfake,
+                "confidence_score": detection_result["confidence"] * 100.0,  # Convert to 0-100 scale
+                "is_deepfake": detection_result["is_deepfake"],
                 "analysis_metadata": {
-                    "model": "efficientnet",
-                    "method": "single",
-                    "device": "cpu",
-                    "input_size": [224, 224],
-                    "processing_time": detection_result.processing_time
+                    "model": detection_result.get("model", "huggingface_detector"),
+                    "method": detection_result.get("method", "huggingface_vit"),
+                    "device": detection_result.get("device", "cpu"),
+                    "input_size": detection_result.get("input_size", [224, 224]),
+                    "processing_time": detection_result.get("inference_time", 0.0)
                 },
-                "analysis_time": detection_result.analysis_time.isoformat(),
-                "processing_time_seconds": detection_result.processing_time,
+                "analysis_time": analysis_time.isoformat(),
+                "processing_time_seconds": detection_result.get("inference_time", 0.0),
                 "error": None
             },
-            "created_at": detection_result.analysis_time
+            "created_at": analysis_time
         }
         
     except Exception as e:
@@ -247,7 +258,7 @@ async def get_analysis_history(
                 metadata = {}
             
             api_detection_result = {
-                "confidence_score": result.confidence_score,  # Already in 0-100 scale
+                "confidence_score": result.confidence_score * 100.0,  # Convert from 0-1 to 0-100 scale
                 "is_deepfake": result.is_deepfake,
                 "analysis_metadata": metadata,
                 "analysis_time": result.analysis_time.isoformat(),

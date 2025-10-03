@@ -211,9 +211,11 @@ const Results = () => {
   };
 
   const getVerdict = (confidence) => {
-    if (confidence >= 70) return 'FAKE';
-    if (confidence >= 30) return 'UNCERTAIN';
-    return 'REAL';
+    // Confidence should represent certainty, not determine the prediction
+    // The actual prediction comes from the is_deepfake field
+    if (confidence >= 70) return 'HIGH CONFIDENCE';
+    if (confidence >= 30) return 'MEDIUM CONFIDENCE';
+    return 'LOW CONFIDENCE';
   };
 
   const getVerdictColor = (confidence) => {
@@ -437,15 +439,15 @@ const Results = () => {
                       
                       <div className="mb-3">
                         <div className="d-flex justify-content-between align-items-center mb-2">
-                          <span className="text-muted">Confidence:</span>
+                          <span className="text-muted">{isDeepfake ? 'Fake' : 'Real'} Confidence:</span>
                           <span className={`badge bg-${getConfidenceColor(confidenceScore)}`}>
                             {confidenceScore === 0 ? 'N/A' : `${confidenceScore.toFixed(1)}%`}
                           </span>
                         </div>
                         <div className="d-flex justify-content-between align-items-center">
-                          <span className="text-muted">Verdict:</span>
-                          <span className={`badge bg-${getVerdictColor(confidenceScore)}`}>
-                            {confidenceScore === 0 ? 'PENDING' : getVerdict(confidenceScore)}
+                          <span className="text-muted">Prediction:</span>
+                          <span className={`badge ${confidenceScore === 0 ? 'bg-secondary' : (isDeepfake ? 'bg-danger' : 'bg-success')}`}>
+                            {confidenceScore === 0 ? 'PENDING' : (isDeepfake ? 'FAKE' : 'REAL')}
                           </span>
                         </div>
                         <div className="d-flex justify-content-between align-items-center">
@@ -719,7 +721,7 @@ const Results = () => {
                               </span>
                             </div>
                             <div className="col-4">
-                              <small className="text-muted">Confidence</small><br/>
+                              <small className="text-muted">{result.isDeepfake ? 'Fake' : 'Real'} Prob.</small><br/>
                               <span className="fw-bold">{result.confidence?.toFixed(1)}%</span>
                             </div>
                           </div>
@@ -781,7 +783,7 @@ const Results = () => {
                             </span>
                           </div>
                           <div className="text-center mt-2">
-                            <span className="text-muted">Confidence: </span>
+                            <span className="text-muted">{result.isDeepfake ? 'Fake' : 'Real'} Probability: </span>
                             <span className="fw-bold">{result.confidence?.toFixed(1)}%</span>
                           </div>
                         </div>
@@ -878,20 +880,20 @@ const Results = () => {
               </h5>
             </div>
             <div className="card-body">
-              {/* Verdict */}
+              {/* Prediction */}
               <div className="text-center mb-4">
-                <h3 className={`text-${getVerdictColor(result.confidence)} mb-2`}>
-                  {getVerdict(result.confidence)}
+                <h3 className={`text-${result.isDeepfake ? 'danger' : 'success'} mb-2`}>
+                  {result.isDeepfake ? 'FAKE' : 'REAL'}
                 </h3>
-                <span className={`badge bg-${getVerdictColor(result.confidence)} fs-6`}>
-                  {getConfidenceText(result.confidence)}
+                <span className={`badge bg-${result.isDeepfake ? 'danger' : 'success'} fs-6`}>
+                  {result.isDeepfake ? 'Deepfake Detected' : 'Authentic Content'}
                 </span>
               </div>
 
               {/* Confidence Score */}
               <div className="mb-4">
                 <div className="d-flex justify-content-between align-items-center mb-2">
-                  <span className="fw-bold">Confidence Score</span>
+                  <span className="fw-bold">{result.isDeepfake ? 'Fake' : 'Real'} Probability</span>
                   <span className={`badge bg-${getConfidenceColor(result.confidence)}`}>
                     {result.confidence.toFixed(1)}%
                   </span>
@@ -909,8 +911,16 @@ const Results = () => {
                   </div>
                 </div>
                 <div className="d-flex justify-content-between mt-1">
-                  <small className="text-muted">Real</small>
-                  <small className="text-muted">Fake</small>
+                  <small className="text-muted">0%</small>
+                  <small className="text-muted">100%</small>
+                </div>
+                <div className="text-center mt-2">
+                  <small className="text-muted">
+                    {result.isDeepfake 
+                      ? `Model is ${result.confidence.toFixed(1)}% confident this is FAKE` 
+                      : `Model is ${result.confidence.toFixed(1)}% confident this is REAL`
+                    }
+                  </small>
                 </div>
               </div>
 
@@ -982,10 +992,10 @@ const Results = () => {
                 <div className="col-md-6">
                   <h6>Detection Information</h6>
                   <ul className="list-unstyled">
-                    <li><strong>Deepfake Probability:</strong> {result.confidence.toFixed(1)}%</li>
-                    <li><strong>Verdict:</strong> 
-                      <span className={`badge bg-${getVerdictColor(result.confidence)} ms-2`}>
-                        {getVerdict(result.confidence)}
+                    <li><strong>{result.isDeepfake ? 'Fake' : 'Real'} Probability:</strong> {result.confidence.toFixed(1)}%</li>
+                    <li><strong>Prediction:</strong> 
+                      <span className={`badge bg-${result.isDeepfake ? 'danger' : 'success'} ms-2`}>
+                        {result.isDeepfake ? 'FAKE' : 'REAL'}
                       </span>
                     </li>
                     <li><strong>Processing Time:</strong> {result.analysisTime}</li>

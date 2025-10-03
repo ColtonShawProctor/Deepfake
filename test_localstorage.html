@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LocalStorage Test</title>
+</head>
+<body>
+    <h1>LocalStorage Test</h1>
+    <div id="status"></div>
+    <button onclick="testStorage()">Test Storage</button>
+    <button onclick="checkStorage()">Check Storage</button>
+    <button onclick="clearStorage()">Clear Storage</button>
+    
+    <script>
+        function testStorage() {
+            const statusDiv = document.getElementById('status');
+            
+            try {
+                // Test basic localStorage functionality
+                localStorage.setItem('test_key', 'test_value');
+                const retrieved = localStorage.getItem('test_key');
+                
+                if (retrieved === 'test_value') {
+                    statusDiv.innerHTML = '✅ LocalStorage is working correctly';
+                    
+                    // Test with the actual token key
+                    const testToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test';
+                    localStorage.setItem('token', testToken);
+                    
+                    const storedToken = localStorage.getItem('token');
+                    if (storedToken === testToken) {
+                        statusDiv.innerHTML += '<br>✅ Token storage is working';
+                    } else {
+                        statusDiv.innerHTML += '<br>❌ Token storage failed';
+                    }
+                } else {
+                    statusDiv.innerHTML = '❌ LocalStorage basic functionality failed';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `❌ LocalStorage error: ${error.message}`;
+                console.error('LocalStorage error:', error);
+            }
+        }
+        
+        function checkStorage() {
+            const statusDiv = document.getElementById('status');
+            const testValue = localStorage.getItem('test_key');
+            const token = localStorage.getItem('token');
+            
+            statusDiv.innerHTML = `Test value: ${testValue}<br>Token: ${token ? token.substring(0, 20) + '...' : 'None'}`;
+        }
+        
+        function clearStorage() {
+            localStorage.removeItem('test_key');
+            localStorage.removeItem('token');
+            document.getElementById('status').innerHTML = '✅ Storage cleared';
+        }
+        
+        // Test on page load
+        window.onload = function() {
+            testStorage();
+        };
+    </script>
+</body>
+</html>

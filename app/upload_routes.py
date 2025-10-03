@@ -82,73 +82,102 @@ async def upload_file(
     - **Authentication required**
     """
     
-    # Create uploads directory if it doesn't exist
-    create_upload_directory()
-    
-    # Validate file type
-    if file.content_type not in ALLOWED_IMAGE_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file type. Allowed types: {', '.join(ALLOWED_IMAGE_TYPES)}"
-        )
-    
-    # Validate file size
-    file_content = await file.read()
-    if len(file_content) > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024*1024)}MB"
-        )
-    
-    # Validate that it's actually an image
-    if not validate_image_file(file_content):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid image file. File must be a valid JPEG or PNG image."
-        )
-    
-    # Generate unique filename
-    unique_filename = generate_unique_filename(file.filename)
-    file_path = UPLOAD_DIR / unique_filename
-    
     try:
-        # Save file to disk
-        with open(file_path, "wb") as buffer:
-            buffer.write(file_content)
+        # Create uploads directory if it doesn't exist
+        create_upload_directory()
         
-        # Determine file type using Pillow
-        file_type = get_file_type(file_content, file.filename)
+        # Validate file type
+        if file.content_type not in ALLOWED_IMAGE_TYPES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid file type. Allowed types: {', '.join(ALLOWED_IMAGE_TYPES)}"
+            )
         
-        # Store metadata in database
-        media_file = MediaFile(
-            user_id=current_user.id,
-            filename=file.filename,  # Original filename
-            file_path=str(file_path),  # Full path to saved file
-            file_size=len(file_content),
-            file_type=file_type
-        )
+        # Validate file size
+        file_content = await file.read()
+        if len(file_content) > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024*1024)}MB"
+            )
         
-        db.add(media_file)
-        db.commit()
-        db.refresh(media_file)
+        # Validate that it's actually an image
+        if not validate_image_file(file_content):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid image file. File must be a valid JPEG or PNG image."
+            )
         
-        return UploadResponse(
-            file_id=media_file.id,
-            filename=file.filename,
-            file_size=media_file.file_size,
-            file_type=media_file.file_type,
-            upload_time=media_file.upload_time,
-            message="File uploaded successfully"
-        )
+        # Generate unique filename
+        unique_filename = generate_unique_filename(file.filename)
+        file_path = UPLOAD_DIR / unique_filename
         
+        try:
+            # Save file to disk
+            with open(file_path, "wb") as buffer:
+                buffer.write(file_content)
+            
+            # Determine file type using Pillow
+            file_type = get_file_type(file_content, file.filename)
+            
+            # Store metadata in database
+            media_file = MediaFile(
+                user_id=current_user.id,
+                filename=file.filename,  # Original filename
+                file_path=str(file_path),  # Full path to saved file
+                file_size=len(file_content),
+                file_type=file_type
+            )
+            
+            db.add(media_file)
+            db.commit()
+            db.refresh(media_file)
+            
+            return UploadResponse(
+                file_id=media_file.id,
+                filename=file.filename,
+                file_size=media_file.file_size,
+                file_type=media_file.file_type,
+                upload_time=media_file.upload_time,
+                message="File uploaded successfully"
+            )
+            
+        except Exception as e:
+            # Clean up file if database operation fails
+            if file_path.exists():
+                file_path.unlink()
+            
+            # Log the specific error for debugging
+            print(f"ERROR: Database operation failed: {str(e)}")
+            print(f"ERROR: File path: {file_path}")
+            print(f"ERROR: User ID: {current_user.id}")
+            print(f"ERROR: File size: {len(file_content)}")
+            
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Database operation failed: {str(e)}"
+            )
+            
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
-        # Clean up file if database operation fails
-        if file_path.exists():
-            file_path.unlink()
+        # Log unexpected errors for debugging
+        print(f"ERROR: Unexpected error in upload_file: {str(e)}")
+        print(f"ERROR: Error type: {type(e).__name__}")
+        print(f"ERROR: File: {file.filename if file else 'None'}")
+        print(f"ERROR: User: {current_user.id if current_user else 'None'}")
+        
+        # Clean up any partially created files
+        if 'file_path' in locals() and file_path.exists():
+            try:
+                file_path.unlink()
+            except Exception as cleanup_error:
+                print(f"ERROR: Failed to cleanup file: {cleanup_error}")
         
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload file: {str(e)}"
+            detail=f"Unexpected error during upload: {str(e)}"
         )
 
 @router.get("/files", response_model=List[UploadResponse])

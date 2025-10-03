@@ -1,0 +1,161 @@
+{
+  "demo_files": {
+    "real_images": [
+      {
+        "id": 65,
+        "file_id": 65,
+        "filename": "real_original.jpg",
+        "confidence_score": 0.757217228412628,
+        "confidence_percentage": 75.7,
+        "is_deepfake": false,
+        "classification": "REAL",
+        "status": "Correctly classified",
+        "description": "High confidence real image - great for demo"
+      },
+      {
+        "id": 113,
+        "file_id": 113,
+        "filename": "04_real_medium_confidence.jpg",
+        "confidence_score": 0.757217228412628,
+        "confidence_percentage": 75.7,
+        "is_deepfake": false,
+        "classification": "REAL",
+        "status": "Correctly classified",
+        "description": "High confidence real image - great for demo"
+      },
+      {
+        "id": 52,
+        "file_id": 52,
+        "filename": "real_celebrity_1.jpg",
+        "confidence_score": 0.716954588890076,
+        "confidence_percentage": 71.7,
+        "is_deepfake": false,
+        "classification": "REAL",
+        "status": "Correctly classified",
+        "description": "Medium-high confidence real image - great for demo"
+      }
+    ],
+    "fake_images": [
+      {
+        "id": 100,
+        "file_id": 100,
+        "filename": "id0_id16_0002.mp4",
+        "confidence_score": 0.989879995584488,
+        "confidence_percentage": 99.0,
+        "is_deepfake": true,
+        "classification": "FAKE",
+        "status": "Correctly classified",
+        "description": "Very high confidence fake video - excellent for demo"
+      },
+      {
+        "id": 97,
+        "file_id": 97,
+        "filename": "id0_0002.mp4",
+        "confidence_score": 0.983912605047226,
+        "confidence_percentage": 98.4,
+        "is_deepfake": true,
+        "classification": "FAKE",
+        "status": "Correctly classified",
+        "description": "Very high confidence fake video - excellent for demo"
+      },
+      {
+        "id": 98,
+        "file_id": 98,
+        "filename": "id0_id16_0000.mp4",
+        "confidence_score": 0.953758965839039,
+        "confidence_percentage": 95.4,
+        "is_deepfake": true,
+        "classification": "FAKE",
+        "status": "Correctly classified",
+        "description": "High confidence fake video - great for demo"
+      }
+    ]
+  },
+  "summary": {
+    "total_files": 6,
+    "real_count": 3,
+    "fake_count": 3,
+    "confidence_range": {
+      "real_images": "71.7% - 75.7%",
+      "fake_images": "95.4% - 99.0%"
+    },
+    "accuracy": "100%",
+    "demo_quality": "Excellent - clear separation between real and fake classifications"
+  },
+  "usage_notes": {
+    "frontend_urls": [
+      "http://localhost:3000/results/52",
+      "http://localhost:3000/results/65", 
+      "http://localhost:3000/results/97",
+      "http://localhost:3000/results/98",
+      "http://localhost:3000/results/100",
+      "http://localhost:3000/results/113"
+    ],
+    "api_endpoints": [
+      "http://localhost:8000/api/analysis/results/52",
+      "http://localhost:8000/api/analysis/results/65",
+      "http://localhost:8000/api/analysis/results/97", 
+      "http://localhost:8000/api/analysis/results/98",
+      "http://localhost:8000/api/analysis/results/100",
+      "http://localhost:8000/api/analysis/results/113"
+    ]
+  },
+  "video_demo_files": {
+    "fake_videos": [
+      {
+        "id": 100,
+        "file_id": 100,
+        "filename": "id0_id16_0002.mp4",
+        "confidence_score": 0.989879995584488,
+        "confidence_percentage": 99.0,
+        "is_deepfake": true,
+        "classification": "FAKE",
+        "status": "Correctly classified",
+        "description": "Very high confidence fake video - excellent for demo"
+      },
+      {
+        "id": 97,
+        "file_id": 97,
+        "filename": "id0_0002.mp4",
+        "confidence_score": 0.983912605047226,
+        "confidence_percentage": 98.4,
+        "is_deepfake": true,
+        "classification": "FAKE",
+        "status": "Correctly classified",
+        "description": "Very high confidence fake video - excellent for demo"
+      }
+    ],
+    "real_videos": [
+      {
+        "id": 108,
+        "file_id": 108,
+        "filename": "real_02_00250.mp4",
+        "confidence_score": 0.606086736375635,
+        "confidence_percentage": 60.6,
+        "is_deepfake": true,
+        "classification": "FAKE (but filename suggests real)",
+        "status": "Model uncertainty - good for showing edge cases",
+        "description": "Medium confidence - shows model limitations"
+      },
+      {
+        "id": 123,
+        "file_id": 123,
+        "filename": "real_01_id5_0000.mp4",
+        "confidence_score": 0.93640970100056,
+        "confidence_percentage": 93.6,
+        "is_deepfake": true,
+        "classification": "FAKE (but filename suggests real)",
+        "status": "Model uncertainty - good for showing edge cases",
+        "description": "High confidence - shows model limitations"
+      }
+    ]
+  },
+  "selection_criteria": {
+    "model": "huggingface_detector",
+    "classification_accuracy": "100% correct for images, mixed for videos",
+    "confidence_range": "Good spread (60.6% - 99.0%)",
+    "file_types": "Images and videos",
+    "clear_separation": "No overlap between real and fake confidence scores for images",
+    "video_notes": "Videos show model uncertainty with real content - good for demo"
+  }
+}

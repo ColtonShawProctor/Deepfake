@@ -225,6 +225,9 @@ class EfficientNetDetector(BaseDetector):
         # EfficientNet-specific configuration
         self.config = config or {}
         self.dropout_rate = self.config.get("dropout_rate", 0.3)
+        # IMPORTANT: This model was trained so that:
+        # - High confidence (0.5+) = REAL image (model is confident it's real)
+        # - Low confidence (0.0-0.5) = FAKE/deepfake image (model detects manipulation)
         self.confidence_threshold = self.config.get("confidence_threshold", 0.5)
         self.enable_attention = self.config.get("enable_attention", True)
         self.mobile_optimized = self.config.get("mobile_optimized", True)
@@ -402,7 +405,10 @@ class EfficientNetDetector(BaseDetector):
                 confidence = output.item()
             
             # Determine prediction
-            is_deepfake = confidence > self.confidence_threshold
+            # FIXED: Your model was trained so that high confidence = REAL, low confidence = FAKE
+            # High confidence (0.5+) means the model is confident it's a REAL image
+            # Low confidence (0.0-0.5) means the model detects it as FAKE/deepfake
+            is_deepfake = confidence < self.confidence_threshold
             
             # Generate attention map if enabled
             attention_maps = None

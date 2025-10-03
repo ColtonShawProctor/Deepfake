@@ -1,19 +1,21 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from app.database import Base
 from datetime import datetime
 
 class MediaFile(Base):
-    """MediaFile model for storing uploaded media files"""
+    """Media file model for storing file information"""
     __tablename__ = "media_files"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     filename = Column(String(255), nullable=False)
     file_path = Column(String(500), nullable=False)
+    file_size = Column(Integer, nullable=False)
+    file_type = Column(String(50), nullable=False)
     upload_time = Column(DateTime, default=datetime.utcnow, nullable=False)
-    file_size = Column(Integer, nullable=False)  # Size in bytes
-    file_type = Column(String(50), nullable=False)  # e.g., 'image/jpeg', 'video/mp4'
+    file_metadata = Column(Text, nullable=True)
     
     # Relationships
     user = relationship("User", back_populates="media_files")

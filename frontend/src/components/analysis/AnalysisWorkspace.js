@@ -477,7 +477,7 @@ const ExpertSidePanel = ({ results, onVisualizationChange, onSettingsChange }) =
         
         <div className="pt-2 border-t border-slate-200">
           <div className="text-xs text-slate-500 space-y-1">
-            <div>Ensemble Score: {results?.ensemble?.confidence?.toFixed(1)}%</div>
+            <div>Ensemble Score: {results?.ensemble?.confidence?.toFixed(1)}% ({results?.ensemble?.isDeepfake ? 'FAKE' : 'REAL'})</div>
             <div>Domain Agreement: {results?.ensemble?.agreement?.toFixed(2)}</div>
             <div>Processing Time: {results?.metadata?.processingTime}ms</div>
           </div>

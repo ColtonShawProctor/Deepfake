@@ -18,7 +18,9 @@ const Login = () => {
 
   // Redirect if already authenticated
   useEffect(() => {
+    console.log('Login useEffect - isAuthenticated:', isAuthenticated);
     if (isAuthenticated) {
+      console.log('Login: User is authenticated, redirecting to dashboard');
       navigate('/dashboard');
     }
   }, [isAuthenticated, navigate]);
@@ -75,10 +77,14 @@ const Login = () => {
     clearError();
 
     try {
+      console.log('Login: Attempting login for:', formData.email);
       const response = await login(formData.email, formData.password);
-      console.log('Login successful:', response);
-      // Navigation will be handled by useEffect when user state changes
+      console.log('Login: Login successful, response:', response);
+      
+      // Don't navigate here - let the useEffect handle it when isAuthenticated changes
+      console.log('Login: Waiting for auth state to update...');
     } catch (err) {
+      console.error('Login: Login failed:', err);
       handleError(err);
     } finally {
       setLoading(false);

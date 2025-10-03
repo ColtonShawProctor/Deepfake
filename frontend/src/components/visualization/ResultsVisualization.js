@@ -471,7 +471,7 @@ const ResultsVisualization = forwardRef(({
             <div className="text-2xl font-bold text-slate-900">
               {(model.confidence * 100).toFixed(1)}%
             </div>
-            <div className="text-sm text-slate-600">Confidence</div>
+            <div className="text-sm text-slate-600">Confidence ({ensembleResult.isDeepfake ? 'FAKE' : 'REAL'})</div>
           </div>
         </div>
       ))}
@@ -549,7 +549,7 @@ const ResultsVisualization = forwardRef(({
           >
             <div className="text-sm">
               <div>Position: ({hoveredRegion.x}, {hoveredRegion.y})</div>
-              <div>Confidence: {(hoveredRegion.confidence * 100).toFixed(1)}%</div>
+              <div>Confidence: {(hoveredRegion.confidence * 100).toFixed(1)}% ({ensembleResult.isDeepfake ? 'FAKE' : 'REAL'})</div>
             </div>
           </motion.div>
         )}

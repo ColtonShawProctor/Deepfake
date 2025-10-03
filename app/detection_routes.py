@@ -8,13 +8,13 @@ from app.auth import get_current_user
 from app.models.user import User
 from app.models.media_file import MediaFile
 from app.models.detection_result import DetectionResult as DetectionResultModel
-from app.schemas import DetectionResponse, DetectorInfo
-from app.models.optimized_efficientnet_detector import OptimizedEfficientNetDetector
+from app.schemas import DetectionResponse, DetectorInfo, DetectionResult
+from app.models.huggingface_detector import HuggingFaceDetectorWrapper
 
 router = APIRouter(prefix="/api/detection", tags=["deepfake detection"])
 
-# Initialize the single EfficientNet detector
-detector = OptimizedEfficientNetDetector("models/efficientnet_weights.pth")
+# Initialize the Hugging Face detector (replaces broken EfficientNet)
+detector = HuggingFaceDetectorWrapper()
 
 @router.get("/info", response_model=DetectorInfo)
 async def get_detector_info():
@@ -158,7 +158,7 @@ async def get_detection_result(
     from app.schemas import DetectionResult
     
     api_detection_result = DetectionResult(
-        confidence_score=detection_result.confidence_score,  # Already in 0-100 scale
+        confidence_score=detection_result.confidence_score * 100.0,  # Convert from 0-1 to 0-100 scale
         is_deepfake=detection_result.is_deepfake,
         analysis_metadata=metadata,
         analysis_time=detection_result.analysis_time.isoformat(),
@@ -177,48 +177,72 @@ async def get_detection_result(
 
 @router.get("/results", response_model=List[DetectionResponse])
 async def get_user_detection_results(
+    page: int = 1,
+    limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Get all detection results for the current user's files
+    Get all detection results for the current user's files with pagination
     """
-    # Get all files owned by the user that have detection results
-    results = db.query(DetectionResultModel).join(MediaFile).filter(
-        MediaFile.user_id == current_user.id
-    ).order_by(DetectionResultModel.analysis_time.desc()).all()
-    
-    response_list = []
-    for result in results:
-        # Get the associated media file
-        media_file = db.query(MediaFile).filter(MediaFile.id == result.media_file_id).first()
+    try:
+        # Calculate offset for pagination
+        offset = (page - 1) * limit
         
-        if media_file:
+        # Get total count for pagination
+        total_count = db.query(DetectionResultModel).join(MediaFile).filter(
+            MediaFile.user_id == current_user.id
+        ).count()
+        
+        # Get paginated results
+        results = db.query(DetectionResultModel).join(MediaFile).filter(
+            MediaFile.user_id == current_user.id
+        ).order_by(DetectionResultModel.analysis_time.desc()).offset(offset).limit(limit).all()
+        
+        response_list = []
+        for result in results:
             try:
-                metadata = json.loads(result.result_metadata)
-            except json.JSONDecodeError:
-                metadata = {}
-            
-            # Create proper DetectionResult object
-            api_detection_result = DetectionResult(
-                confidence_score=result.confidence_score,
-                is_deepfake=result.is_deepfake,
-                analysis_metadata=metadata,
-                analysis_time=result.analysis_time.isoformat(),
-                processing_time_seconds=result.processing_time,
-                error=None
-            )
-            
-            response_list.append(DetectionResponse(
-                success=True,
-                message="Detection result retrieved successfully",
-                file_id=media_file.id,
-                filename=media_file.filename,
-                detection_result=api_detection_result,
-                created_at=result.analysis_time
-            ))
-    
-    return response_list
+                # Get the associated media file
+                media_file = db.query(MediaFile).filter(MediaFile.id == result.media_file_id).first()
+                
+                if media_file:
+                    try:
+                        metadata = json.loads(result.result_metadata) if result.result_metadata else {}
+                    except json.JSONDecodeError:
+                        metadata = {}
+                    
+                    # Create proper DetectionResult object
+                    api_detection_result = DetectionResult(
+                        confidence_score=result.confidence_score * 100.0,  # Convert from 0-1 to 0-100 scale
+                        is_deepfake=result.is_deepfake,
+                        analysis_metadata=metadata,
+                        analysis_time=result.analysis_time.isoformat(),
+                        processing_time_seconds=result.processing_time,  # Map from database field
+                        error=None
+                    )
+                    
+                    response_list.append(DetectionResponse(
+                        success=True,
+                        message="Detection result retrieved successfully",
+                        file_id=media_file.id,
+                        filename=media_file.filename,
+                        file_size=media_file.file_size,
+                        file_type=media_file.file_type,
+                        detection_result=api_detection_result,
+                        created_at=result.analysis_time
+                    ))
+            except Exception as e:
+                print(f"Error processing result {result.id}: {str(e)}")
+                continue
+        
+        return response_list
+        
+    except Exception as e:
+        print(f"Error in get_user_detection_results: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve results: {str(e)}"
+        )
 
 @router.delete("/results/{file_id}")
 async def delete_detection_result(

@@ -1,13 +1,14 @@
-from app.config import settings
-from passlib.context import CryptContext  
-from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from typing import Optional
-from sqlalchemy.orm import Session
+
 from app.database import get_db
 from app.models.user import User
+from app.config import settings
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -57,15 +58,21 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         if payload is None:
             raise credentials_exception
         
-        user_id: int = payload.get("sub")
+        user_id: str = payload.get("sub")
         if user_id is None:
+            raise credentials_exception
+        
+        # Convert string user ID to integer
+        try:
+            user_id_int = int(user_id)
+        except (ValueError, TypeError):
             raise credentials_exception
         
     except JWTError:
         raise credentials_exception
     
     # Get user from database
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.query(User).filter(User.id == user_id_int).first()
     if user is None:
         raise credentials_exception
     
@@ -88,11 +95,26 @@ def get_current_active_user(current_user: User = Depends(get_current_user)) -> U
 
 def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
     """Authenticate a user with email and password"""
+    print(f"DEBUG: authenticate_user called with email='{email}', password='{password}'")
+    
     user = db.query(User).filter(User.email == email).first()
+    print(f"DEBUG: User found: {user is not None}")
+    
     if not user:
+        print("DEBUG: No user found")
         return None
-    if not verify_password(password, user.password_hash):
+    
+    print(f"DEBUG: User email: {user.email}, is_active: {user.is_active}")
+    
+    # Test password verification
+    password_valid = user.verify_password(password)
+    print(f"DEBUG: Password verification result: {password_valid}")
+    
+    if not password_valid:
+        print("DEBUG: Password verification failed")
         return None
+    
+    print("DEBUG: Authentication successful")
     return user
 
 def create_user(db: Session, email: str, password: str) -> User:

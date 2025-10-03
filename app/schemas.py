@@ -163,7 +163,7 @@ class VideoUploadResponse(BaseModel):
     success: bool
     message: str
     file_id: int
-    task_id: str
+    task_id: Optional[str] = None
     filename: str
     video_metadata: VideoMetadata
 
