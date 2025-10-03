@@ -35,6 +35,7 @@ from ..models.mesonet_detector import MesoNetDetector, MesoNetConfig
 from ..models.deepfake_models import ResNetDetector, EfficientNetDetector, F3NetDetector
 from ..models.model_selector import ModelSelector
 from ..models.preprocessing_manager import UnifiedPreprocessingManager
+from ..models.adaptive_weighting import AdaptiveWeighting, WeightingStrategy, EnsemblePruningMode, WeightingContext
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -102,6 +103,12 @@ class MultiModelAPI:
         
         # Initialize unified preprocessing manager
         self.preprocessing_manager = UnifiedPreprocessingManager()
+        
+        # Initialize adaptive weighting system
+        self.adaptive_weighting = AdaptiveWeighting(
+            strategy=WeightingStrategy.HYBRID,
+            pruning_mode=EnsemblePruningMode.ADAPTIVE
+        )
         
         # Task tracking
         self.active_tasks: Dict[str, Dict] = {}
@@ -183,9 +190,33 @@ class MultiModelAPI:
                 preprocessing_result, model_instances
             )
             
-            # Calculate overall results
-            confidences = [result.confidence_score for result in model_results.values()]
-            overall_confidence = sum(confidences) / len(confidences)
+            # Create weighting context
+            weighting_context = WeightingContext(
+                input_complexity=input_analysis.complexity.value,
+                model_confidences={name: result.confidence_score for name, result in model_results.items()},
+                model_correlations={},  # Will be calculated by adaptive weighting
+                historical_performance={},  # Will be retrieved from adaptive weighting
+                uncertainty_scores={name: 1.0 - (result.confidence_score / 100.0) for name, result in model_results.items()},
+                processing_time=preprocessing_result.preprocessing_time,
+                memory_usage=0.0  # Could be calculated if needed
+            )
+            
+            # Calculate adaptive weights
+            adaptive_weights = self.adaptive_weighting.calculate_adaptive_weights(
+                model_results, weighting_context
+            )
+            
+            # Apply adaptive weighting to calculate overall results
+            weighted_confidence = 0.0
+            total_weight = 0.0
+            
+            for model_name, result in model_results.items():
+                if model_name in adaptive_weights.weights:
+                    weight = adaptive_weights.weights[model_name]
+                    weighted_confidence += result.confidence_score * weight
+                    total_weight += weight
+            
+            overall_confidence = weighted_confidence / total_weight if total_weight > 0 else 0.0
             overall_verdict = "DEEPFAKE" if overall_confidence > 50.0 else "AUTHENTIC"
             
             processing_time = time.time() - start_time
@@ -211,6 +242,13 @@ class MultiModelAPI:
                         "noise_level": input_analysis.noise_level
                     },
                     "selection_rationale": selection_rationale,
+                    "adaptive_weighting": {
+                        "strategy": adaptive_weights.strategy_used.value,
+                        "weights": adaptive_weights.weights,
+                        "pruned_models": adaptive_weights.pruning_applied,
+                        "confidence_adjustment": adaptive_weights.confidence_adjustment,
+                        "rationale": adaptive_weights.rationale
+                    },
                     "optimization_enabled": True
                 }
             )
@@ -732,4 +770,134 @@ async def analyze_image_ultra_optimized(file: UploadFile = File(...)):
         
     except Exception as e:
         logger.error(f"Ultra-optimized analysis failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+
+@router.get("/adaptive-weighting/info")
+async def get_adaptive_weighting_info():
+    """Get information about adaptive weighting capabilities"""
+    try:
+        if not hasattr(api_instance, 'adaptive_weighting'):
+            raise HTTPException(status_code=503, detail="Adaptive weighting not available")
+        
+        weighting = api_instance.adaptive_weighting
+        
+        return {
+            "available_strategies": [strategy.value for strategy in WeightingStrategy],
+            "available_pruning_modes": [mode.value for mode in EnsemblePruningMode],
+            "current_strategy": weighting.strategy.value,
+            "current_pruning_mode": weighting.pruning_mode.value,
+            "configuration": {
+                "min_weight_threshold": weighting.min_weight_threshold,
+                "max_correlation_threshold": weighting.max_correlation_threshold,
+                "confidence_boost_factor": weighting.confidence_boost_factor,
+                "uncertainty_penalty_factor": weighting.uncertainty_penalty_factor
+            },
+            "performance_stats": weighting.get_performance_stats()
+        }
+        
+    except Exception as e:
+        logger.error(f"Adaptive weighting info failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get adaptive weighting info: {str(e)}")
+
+
+@router.post("/adaptive-weighting/update-strategy")
+async def update_weighting_strategy(strategy: str):
+    """Update the adaptive weighting strategy"""
+    try:
+        if not hasattr(api_instance, 'adaptive_weighting'):
+            raise HTTPException(status_code=503, detail="Adaptive weighting not available")
+        
+        # Validate strategy
+        try:
+            new_strategy = WeightingStrategy(strategy)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid strategy: {strategy}")
+        
+        # Update strategy
+        api_instance.adaptive_weighting.update_strategy(new_strategy)
+        
+        return {
+            "message": f"Weighting strategy updated to: {strategy}",
+            "current_strategy": new_strategy.value,
+            "available_strategies": [s.value for s in WeightingStrategy]
+        }
+        
+    except Exception as e:
+        logger.error(f"Strategy update failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update strategy: {str(e)}")
+
+
+@router.post("/adaptive-weighting/update-pruning")
+async def update_pruning_mode(mode: str):
+    """Update the ensemble pruning mode"""
+    try:
+        if not hasattr(api_instance, 'adaptive_weighting'):
+            raise HTTPException(status_code=503, detail="Adaptive weighting not available")
+        
+        # Validate pruning mode
+        try:
+            new_mode = EnsemblePruningMode(mode)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid pruning mode: {mode}")
+        
+        # Update pruning mode
+        api_instance.adaptive_weighting.update_pruning_mode(new_mode)
+        
+        return {
+            "message": f"Pruning mode updated to: {mode}",
+            "current_pruning_mode": new_mode.value,
+            "available_modes": [m.value for m in EnsemblePruningMode]
+        }
+        
+    except Exception as e:
+        logger.error(f"Pruning mode update failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update pruning mode: {str(e)}")
+
+
+@router.post("/analyze/maximum-optimization")
+async def analyze_image_maximum_optimization(file: UploadFile = File(...)):
+    """Analyze image with maximum optimization (all phases combined)"""
+    try:
+        # Validate file type
+        if not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="File must be an image")
+        
+        # Read and process image
+        image_data = await file.read()
+        image = Image.open(io.BytesIO(image_data))
+        
+        # Convert to RGB if necessary
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        
+        # Analyze with maximum optimization
+        result = await api_instance.analyze_image_multi_model(image)
+        
+        # Get all optimization stats
+        preprocessing_stats = api_instance.preprocessing_manager.get_performance_stats()
+        weighting_stats = api_instance.adaptive_weighting.get_performance_stats()
+        
+        return {
+            "task_id": result.task_id,
+            "overall_confidence": result.overall_confidence,
+            "overall_verdict": result.overall_verdict,
+            "processing_time": result.processing_time,
+            "model_results": {
+                name: {
+                    "confidence": model_result.confidence_score,
+                    "verdict": model_result.verdict,
+                    "processing_time": model_result.processing_time
+                } for name, model_result in result.model_results.items()
+            },
+            "optimization_info": result.metadata,
+            "preprocessing_stats": preprocessing_stats,
+            "weighting_stats": weighting_stats,
+            "maximum_optimization": True,
+            "phases_active": ["model_selection", "unified_preprocessing", "adaptive_weighting"],
+            "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        logger.error(f"Maximum optimization analysis failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}") 
