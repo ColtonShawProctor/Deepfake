@@ -156,8 +156,13 @@ async def get_detection_result(
     # Create proper DetectionResult object
     from app.schemas import DetectionResult
     
+    # Convert confidence from 0-1 scale to 0-100 scale for API response
+    confidence_score = detection_result.confidence_score
+    if confidence_score <= 1.0:
+        confidence_score = confidence_score * 100
+    
     api_detection_result = DetectionResult(
-        confidence_score=detection_result.confidence_score,  # Already in 0-100 scale
+        confidence_score=confidence_score,  # Convert to 0-100 scale
         is_deepfake=detection_result.is_deepfake,
         analysis_metadata=metadata,
         analysis_time=detection_result.analysis_time.isoformat(),
@@ -210,9 +215,14 @@ async def get_user_detection_results(
                     except json.JSONDecodeError:
                         metadata = {}
                     
+                    # Convert confidence from 0-1 scale to 0-100 scale for API response
+                    confidence_score = result.confidence_score
+                    if confidence_score <= 1.0:
+                        confidence_score = confidence_score * 100
+                    
                     # Create proper DetectionResult object
                     api_detection_result = DetectionResult(
-                        confidence_score=result.confidence_score,  # Already in 0-100 scale
+                        confidence_score=confidence_score,  # Convert to 0-100 scale
                         is_deepfake=result.is_deepfake,
                         analysis_metadata=metadata,
                         analysis_time=result.analysis_time.isoformat(),

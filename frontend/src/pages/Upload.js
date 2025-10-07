@@ -130,14 +130,8 @@ const Upload = () => {
       setUploading(false);
       setAnalyzing(true);
 
-      // Use multi-model API for more accurate analysis
-      const multiModelResponse = await analysisAPI.analyzeFileMultiModel(selectedFile, {
-        use_ensemble: true,
-        generate_heatmaps: true
-      });
-      
-      // Transform multi-model response to match existing UI expectations
-      const analysisResponse = analysisAPI.transformMultiModelResponse(multiModelResponse);
+      // Use single model API for analysis (HuggingFace detector)
+      const analysisResponse = await analysisAPI.analyzeFile(parseInt(uploadResponse.file_id));
       
       // Set file info in the response
       analysisResponse.file_id = uploadResponse.file_id;
@@ -206,7 +200,7 @@ const Upload = () => {
               {error && (
                 <div className="alert alert-danger alert-dismissible fade show mb-4" role="alert">
                   <i className="fas fa-exclamation-triangle me-2"></i>
-                  {error}
+                  {typeof error === 'string' ? error : JSON.stringify(error)}
                   <button 
                     type="button" 
                     className="btn-close" 

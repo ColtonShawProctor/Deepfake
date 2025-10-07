@@ -102,12 +102,12 @@ class HuggingFaceDetector(BaseDetector):
                 # Convert to percentage
                 confidence_percentage = confidence_score * 100.0
                 
-                # FIXED: The model's actual class labels are {0: 'Fake', 1: 'Real'}
-                # So class 0 is fake, class 1 is real
-                is_deepfake = predicted_class == 0  # Class 0 is fake/deepfake
+                # CORRECTED: The model's actual class labels are {0: 'Real', 1: 'Fake'}
+                # So class 0 is real, class 1 is fake
+                is_deepfake = predicted_class == 1  # Class 1 is fake/deepfake
                 
                 # For confidence, use the probability of the predicted class
-                # If real (class 0), use that probability; if fake (class 1), use that probability
+                # Class 0 is fake, Class 1 is real - use the probability of the predicted class
                 final_confidence = confidence_percentage
             
             processing_time = time.time() - start_time
@@ -122,10 +122,10 @@ class HuggingFaceDetector(BaseDetector):
                     "model_architecture": "Vision Transformer (ViT)",
                     "confidence_threshold": self.confidence_threshold,
                     "predicted_class": predicted_class,
-                    "class_names": ["fake", "real"],  # Class 0 is fake, Class 1 is real
+                    "class_names": ["real", "fake"],  # Class 0 is real, Class 1 is fake
                     "raw_probabilities": {
-                        "fake": probabilities[0, 0].item(),
-                        "real": probabilities[0, 1].item()
+                        "real": probabilities[0, 0].item(),
+                        "fake": probabilities[0, 1].item()
                     }
                 }
             )
@@ -216,9 +216,9 @@ class HuggingFaceDetectorWrapper:
             # DEBUG: Add logging to understand what's happening
             self.logger.info(f"Prediction debug - Class: {predicted_class}, Real prob: {probabilities.get('real', 0.0):.3f}, Fake prob: {probabilities.get('fake', 0.0):.3f}")
             
-            # FIXED: Use the confidence from the core detector, but add threshold-based confidence adjustment
+            # CORRECTED: Use the confidence from the core detector, but add threshold-based confidence adjustment
             # If the model is uncertain (both probabilities are close), reduce confidence
-            # Note: Model labels are {0: 'Fake', 1: 'Real'}, so real_prob is index 1, fake_prob is index 0
+            # Note: Model labels are {0: 'Real', 1: 'Fake'}, so real_prob is index 0, fake_prob is index 1
             real_prob = probabilities.get("real", 0.0)
             fake_prob = probabilities.get("fake", 0.0)
             max_prob = max(real_prob, fake_prob)
@@ -230,11 +230,11 @@ class HuggingFaceDetectorWrapper:
             # Calculate uncertainty threshold based on the difference between probabilities
             prob_difference = abs(real_prob - fake_prob)
             
-            if predicted_class == 0 and real_prob > 0.25:  # Predicted fake but real prob > 25%
+            if predicted_class == 1 and real_prob > 0.25:  # Predicted fake but real prob > 25%
                 # This is likely a false positive - reduce confidence significantly
                 confidence = fake_prob * 0.6  # Reduce confidence by 40%
                 self.logger.warning(f"Potential false positive detected - Real prob: {real_prob:.3f}, reducing confidence from {fake_prob:.3f} to {confidence:.3f}")
-            elif predicted_class == 1 and fake_prob > 0.25:  # Predicted real but fake prob > 25%
+            elif predicted_class == 0 and fake_prob > 0.25:  # Predicted real but fake prob > 25%
                 # This is likely a false negative - reduce confidence
                 confidence = real_prob * 0.6  # Reduce confidence by 40%
                 self.logger.warning(f"Potential false negative detected - Fake prob: {fake_prob:.3f}, reducing confidence from {real_prob:.3f} to {confidence:.3f}")
@@ -247,7 +247,7 @@ class HuggingFaceDetectorWrapper:
             else:
                 confidence = result.confidence  # Use the confidence from the core detector
             
-            # Convert to expected format
+            # Convert to expected format with proper metadata structure
             return {
                 "confidence": confidence,  # Probability of the predicted class
                 "is_deepfake": result.is_deepfake,  # This is already correct from the core detector
@@ -259,7 +259,25 @@ class HuggingFaceDetectorWrapper:
                 "predicted_class": predicted_class,
                 "probabilities": probabilities,
                 "real_confidence": probabilities.get("real", 0.0),
-                "fake_confidence": probabilities.get("fake", 0.0)
+                "fake_confidence": probabilities.get("fake", 0.0),
+                # Add metadata structure expected by frontend
+                "analysis_metadata": {
+                    "method": "single_model",
+                    "models_used": ["huggingface_detector"],
+                    "individual_results": {
+                        "huggingface_detector": {
+                            "confidence_score": confidence,
+                            "is_deepfake": result.is_deepfake,
+                            "processing_time": result.inference_time,
+                            "model_name": "HuggingFace ViT",
+                            "probabilities": probabilities
+                        }
+                    },
+                    "ensemble_method": "single_model",
+                    "processing_time": result.inference_time,
+                    "uncertainty": 0.0,
+                    "domain_agreement": 1.0
+                }
             }
             
         except Exception as e:

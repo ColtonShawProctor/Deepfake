@@ -107,7 +107,7 @@ const VideoUploadPage = () => {
           </div>
           <div className="info-item">
             <h4>Multi-Model Analysis</h4>
-            <p>Each frame is analyzed using our ensemble of deepfake detection models for maximum accuracy.</p>
+            <p>Each frame is analyzed using our advanced deepfake detection model for maximum accuracy.</p>
           </div>
           <div className="info-item">
             <h4>Temporal Consistency</h4>

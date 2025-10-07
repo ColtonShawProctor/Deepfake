@@ -57,7 +57,7 @@ const ResultsVisualization = forwardRef(({
     toggleFullscreen: () => setIsFullscreen(!isFullscreen)
   }));
 
-  // Extract results data
+  // Extract results data with safety checks
   const ensembleResult = results?.ensemble || {};
   const individualResults = results?.individual || {};
   const spatialResults = results?.spatial || {};
@@ -102,6 +102,18 @@ const ResultsVisualization = forwardRef(({
       }
     }
   }, [mode, viewMode, onModeChange]);
+
+  // Early return if no results data (after all hooks)
+  if (!results || Object.keys(results).length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64 text-gray-500">
+        <div className="text-center">
+          <div className="text-lg font-medium">No analysis results available</div>
+          <div className="text-sm">Please run an analysis first</div>
+        </div>
+      </div>
+    );
+  }
 
   // Image interaction handlers
   const handleZoomIn = () => {

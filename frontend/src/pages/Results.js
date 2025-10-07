@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { analysisAPI } from '../services/api';
 import { useApiError } from '../hooks/useApiError';
+import ResultsVisualization from '../components/visualization/ResultsVisualization';
 
 const Results = () => {
   const { fileId } = useParams();
@@ -15,6 +16,8 @@ const Results = () => {
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [loadingMessage] = useState('Loading Analysis Results...');
+  const [visualizationData, setVisualizationData] = useState(null);
+  const [showAdvancedVisualization, setShowAdvancedVisualization] = useState(false);
   
   // Use ref to track if we've already fetched for this fileId
   const hasFetchedRef = useRef(false);
@@ -38,13 +41,19 @@ const Results = () => {
       if (location.state?.analysisResult) {
         const analysisResult = location.state.analysisResult;
         
+        // Handle confidence score scaling properly
+        let confidence = analysisResult.detection_result.confidence_score || 0;
+        if (confidence <= 1.0) {
+          confidence = confidence * 100; // Convert 0-1 scale to 0-100 scale
+        }
+        
         const transformedResult = {
           id: analysisResult.file_id,
           filename: analysisResult.filename,
           uploadDate: new Date(analysisResult.created_at).toLocaleDateString(),
           uploadTime: new Date(analysisResult.created_at).toLocaleTimeString(),
           status: 'completed',
-          confidence: analysisResult.detection_result.confidence_score,
+          confidence: confidence,
           isDeepfake: analysisResult.detection_result.is_deepfake,
           analysisTime: `${analysisResult.detection_result.processing_time_seconds.toFixed(1)}s`,
           createdAt: analysisResult.created_at,
@@ -58,6 +67,7 @@ const Results = () => {
         };
         
         setResult(transformedResult);
+        setVisualizationData(transformDataForVisualization(transformedResult));
         setLoading(false);
         return;
       }
@@ -74,13 +84,19 @@ const Results = () => {
         throw new Error('Invalid response format');
       }
       
+      // Handle confidence score scaling properly
+      let confidence = response.detection_result.confidence_score || 0;
+      if (confidence <= 1.0) {
+        confidence = confidence * 100; // Convert 0-1 scale to 0-100 scale
+      }
+      
       const transformedResult = {
         id: response.file_id,
         filename: response.filename,
         uploadDate: new Date(response.created_at).toLocaleDateString(),
         uploadTime: new Date(response.created_at).toLocaleTimeString(),
         status: 'completed',
-        confidence: response.detection_result.confidence_score,
+        confidence: confidence,
         isDeepfake: response.detection_result.is_deepfake,
         analysisTime: `${response.detection_result.processing_time_seconds.toFixed(1)}s`,
         createdAt: response.created_at,
@@ -94,6 +110,7 @@ const Results = () => {
       };
       
       setResult(transformedResult);
+      setVisualizationData(transformDataForVisualization(transformedResult));
     } catch (err) {
       handleError(err);
       console.error('Error fetching result:', err);
@@ -285,6 +302,59 @@ const Results = () => {
     return null;
   };
 
+  // Transform API data structure to match ResultsVisualization expectations
+  const transformDataForVisualization = (result) => {
+    if (!result || !result.detectionResult) return null;
+
+    const detectionResult = result.detectionResult;
+    const analysisMetadata = detectionResult.analysis_metadata || {};
+
+    // Transform individual model results
+    const individualResults = {};
+    if (analysisMetadata.individual_results) {
+      Object.entries(analysisMetadata.individual_results).forEach(([modelName, modelResult]) => {
+        individualResults[modelName] = {
+          confidence: modelResult.confidence_score,
+          isDeepfake: modelResult.is_deepfake,
+          processingTime: modelResult.processing_time || 0,
+          heatmap_data: modelResult.heatmap_data || null
+        };
+      });
+    }
+
+    // Create ensemble result
+    const ensembleResult = {
+      confidence: detectionResult.confidence_score,
+      isDeepfake: detectionResult.is_deepfake,
+      uncertainty: analysisMetadata.uncertainty || 0,
+      domainAgreement: analysisMetadata.domain_agreement || 0
+    };
+
+    // Create spatial results (for heatmaps)
+    const spatialResults = {};
+    Object.entries(individualResults).forEach(([modelName, modelResult]) => {
+      if (modelResult.heatmap_data) {
+        spatialResults[modelName] = {
+          attention_map: modelResult.heatmap_data.attention_map,
+          spatial_map: modelResult.heatmap_data.spatial_map,
+          frequency_map: modelResult.heatmap_data.frequency_map
+        };
+      }
+    });
+
+    return {
+      ensemble: ensembleResult,
+      individual: individualResults,
+      spatial: spatialResults,
+      frequency: {}, // Add frequency results if available
+      metadata: {
+        processingTime: analysisMetadata.processing_time || 0,
+        modelsUsed: Object.keys(individualResults),
+        ensembleMethod: analysisMetadata.ensemble_method || 'weighted_average'
+      }
+    };
+  };
+
   const getFullFileUrl = (fileUrl) => {
     // If the URL is already absolute, return it
     if (fileUrl && (fileUrl.startsWith('http://') || fileUrl.startsWith('https://'))) {
@@ -451,9 +521,14 @@ const Results = () => {
               // Debug: Log the result structure
               console.log(`Result ${index}:`, result);
               
-              // Safely access the confidence score
-              const confidenceScore = result.detection_result?.confidence_score || 0;
+              // Safely access the confidence score - handle both 0-1 and 0-100 scales
+              let confidenceScore = result.detection_result?.confidence_score || 0;
               const isDeepfake = result.detection_result?.is_deepfake || false;
+              
+              // Convert to 0-100 scale if needed (API returns 0-1 scale)
+              if (confidenceScore <= 1.0) {
+                confidenceScore = confidenceScore * 100;
+              }
               
               return (
                 <div key={index} className="col-md-6 col-lg-4 mb-4">
@@ -576,6 +651,14 @@ const Results = () => {
             </div>
             <div className="d-flex gap-2">
               <button
+                onClick={() => setShowAdvancedVisualization(!showAdvancedVisualization)}
+                className="btn btn-outline-info"
+                title="Toggle advanced visualization with heatmaps"
+              >
+                <i className="fas fa-chart-line me-2"></i>
+                {showAdvancedVisualization ? 'Basic View' : 'Advanced View'}
+              </button>
+              <button
                 onClick={handleRetryAnalysis}
                 className="btn btn-outline-primary"
                 disabled={retryLoading}
@@ -618,9 +701,35 @@ const Results = () => {
         </div>
       </div>
 
-      <div className="row">
-        {/* Image/Video Preview */}
-        <div className="col-lg-6 mb-4">
+      {/* Advanced Visualization Mode */}
+      {showAdvancedVisualization && visualizationData && result.fileUrl && (
+        <div className="row">
+          <div className="col-12 mb-4">
+            <div className="card border-0 shadow-sm">
+              <div className="card-header bg-white border-0 py-3">
+                <h5 className="mb-0">
+                  <i className="fas fa-chart-line me-2 text-primary"></i>
+                  Advanced Analysis Visualization
+                </h5>
+              </div>
+              <div className="card-body p-0">
+                <ResultsVisualization
+                  results={visualizationData}
+                  image={getFullFileUrl(result.fileUrl)}
+                  mode="overview"
+                  userType="general"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Basic View Mode */}
+      {!showAdvancedVisualization && (
+        <div className="row">
+          {/* Image/Video Preview */}
+          <div className="col-lg-6 mb-4">
           <div className="card border-0 shadow-sm h-100">
             <div className="card-header bg-white border-0 py-3">
               <h5 className="mb-0">
@@ -959,17 +1068,21 @@ const Results = () => {
               </div>
 
               {/* Multi-Model Information */}
-              {result.detectionResult?.analysis_metadata?.method === 'multi-model-ensemble' && (
+              {(result.detectionResult?.analysis_metadata?.method === 'multi-model-ensemble' || 
+                result.detectionResult?.analysis_metadata?.individual_results) && (
                 <div className="mb-4">
                   <h6 className="mb-3">
                     <i className="fas fa-layer-group me-2 text-primary"></i>
-                    Multi-Model Analysis
+                    {result.detectionResult?.analysis_metadata?.models_used?.length > 1 ? 'Multi-Model Analysis' : 'Model Analysis'}
                   </h6>
                   <div className="row">
                     <div className="col-12">
                       <div className="alert alert-info">
                         <i className="fas fa-info-circle me-2"></i>
-                        This analysis used an ensemble of {result.detectionResult.analysis_metadata?.models_used?.length || 0} models for enhanced accuracy.
+                        {result.detectionResult.analysis_metadata?.models_used?.length > 1 ? 
+                          `This analysis used an ensemble of ${result.detectionResult.analysis_metadata?.models_used?.length} models for enhanced accuracy.` :
+                          'This analysis used a single deepfake detection model for analysis.'
+                        }
                       </div>
                     </div>
                   </div>
@@ -1081,6 +1194,7 @@ const Results = () => {
           </div>
         </div>
       </div>
+      )}
 
       {/* Additional Details */}
       <div className="row">

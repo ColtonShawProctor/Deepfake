@@ -54,7 +54,7 @@ class ErrorBoundary extends React.Component {
                     <div className="mt-3">
                       <h6>Error Details (Development Only):</h6>
                       <pre className="bg-light p-2 rounded">
-                        {this.state.error.toString()}
+                        {JSON.stringify(this.state.error, null, 2)}
                       </pre>
                       {this.state.errorInfo && (
                         <details className="mt-2">

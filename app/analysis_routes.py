@@ -107,13 +107,13 @@ async def analyze_file(
             uncertainty=None,  # Single model doesn't have ensemble uncertainty
             attention_weights=None,  # Single model doesn't have ensemble weights
             analysis_time=analysis_time,
-            result_metadata=json.dumps({
+            result_metadata=json.dumps(detection_result.get("analysis_metadata", {
                 "method": detection_result.get("method", "huggingface_vit"),
                 "device": detection_result.get("device", "cpu"),
                 "input_size": detection_result.get("input_size", [224, 224]),
                 "predicted_class": detection_result.get("predicted_class", 0),
                 "probabilities": detection_result.get("probabilities", {})
-            })
+            }))
         )
         
         db.add(db_detection_result)
@@ -192,8 +192,13 @@ async def get_analysis_results(
     except json.JSONDecodeError:
         metadata = {}
     
+    # Convert confidence from 0-1 scale to 0-100 scale for API response
+    confidence_score = detection_result.confidence_score
+    if confidence_score <= 1.0:
+        confidence_score = confidence_score * 100
+    
     api_detection_result = {
-        "confidence_score": detection_result.confidence_score,  # Already in 0-100 scale
+        "confidence_score": confidence_score,  # Convert to 0-100 scale
         "is_deepfake": detection_result.is_deepfake,
         "analysis_metadata": metadata,
         "analysis_time": detection_result.analysis_time.isoformat(),
@@ -254,8 +259,13 @@ async def get_analysis_history(
             except json.JSONDecodeError:
                 metadata = {}
             
+            # Convert confidence from 0-1 scale to 0-100 scale for API response
+            confidence_score = result.confidence_score
+            if confidence_score <= 1.0:
+                confidence_score = confidence_score * 100
+            
             api_detection_result = {
-                "confidence_score": result.confidence_score,  # Already in 0-100 scale
+                "confidence_score": confidence_score,  # Convert to 0-100 scale
                 "is_deepfake": result.is_deepfake,
                 "analysis_metadata": metadata,
                 "analysis_time": result.analysis_time.isoformat(),

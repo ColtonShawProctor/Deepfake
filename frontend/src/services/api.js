@@ -518,7 +518,19 @@ export const apiUtils = {
   // Handle API errors with user-friendly messages
   handleError: (error) => {
     if (error.response?.data?.detail) {
-      return error.response.data.detail;
+      const detail = error.response.data.detail;
+      // Handle Pydantic validation errors (array of objects)
+      if (Array.isArray(detail)) {
+        return detail.map(err => 
+          typeof err === 'object' ? `${err.loc?.join('.')}: ${err.msg}` : err
+        ).join('; ');
+      }
+      // Handle single validation error object
+      if (typeof detail === 'object' && detail.msg) {
+        return `${detail.loc?.join('.')}: ${detail.msg}`;
+      }
+      // Handle string detail
+      return typeof detail === 'string' ? detail : JSON.stringify(detail);
     } else if (error.response?.data?.message) {
       return error.response.data.message;
     } else if (error.message) {
