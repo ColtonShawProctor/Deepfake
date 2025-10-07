@@ -1,498 +1,767 @@
 """
-Performance monitoring and logging system for multi-model deepfake detection framework.
-This module provides comprehensive performance tracking and monitoring capabilities.
+Performance Monitoring Integration for Advanced Ensemble Detection
+
+This module implements comprehensive performance monitoring, alerting,
+and continuous optimization for the deepfake detection system.
 """
 
-import json
+import asyncio
 import logging
 import time
-from collections import defaultdict, deque
+import threading
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-
+from enum import Enum
+from typing import Dict, List, Optional, Tuple, Any, Union, Callable
 import numpy as np
 import psutil
-import torch
+import json
+from datetime import datetime, timedelta
+from collections import defaultdict, deque
+import statistics
+from pathlib import Path
+
+from .base_detector import DetectionResult
+
+
+class MetricType(str, Enum):
+    """Types of performance metrics."""
+    LATENCY = "latency"
+    THROUGHPUT = "throughput"
+    ACCURACY = "accuracy"
+    MEMORY = "memory"
+    CPU = "cpu"
+    GPU = "gpu"
+    ERROR_RATE = "error_rate"
+    CACHE_HIT_RATE = "cache_hit_rate"
+    MODEL_PERFORMANCE = "model_performance"
+    ENSEMBLE_EFFICIENCY = "ensemble_efficiency"
+
+
+class AlertLevel(str, Enum):
+    """Alert severity levels."""
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
 
 
 @dataclass
-class PerformanceMetrics:
-    """Performance metrics for a model."""
-    model_name: str
-    inference_count: int = 0
-    total_inference_time: float = 0.0
-    average_inference_time: float = 0.0
-    min_inference_time: float = float('inf')
-    max_inference_time: float = 0.0
-    throughput_fps: float = 0.0
-    accuracy: float = 0.0
-    precision: float = 0.0
-    recall: float = 0.0
-    f1_score: float = 0.0
-    last_updated: float = field(default_factory=time.time)
-    error_count: int = 0
-    success_rate: float = 1.0
+class MetricData:
+    """Performance metric data point."""
+    metric_type: MetricType
+    value: float
+    timestamp: float
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    tags: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
-class SystemMetrics:
-    """System resource metrics."""
-    timestamp: float = field(default_factory=time.time)
-    cpu_percent: float = 0.0
-    memory_percent: float = 0.0
-    gpu_memory_used: Optional[float] = None
-    gpu_memory_total: Optional[float] = None
-    gpu_utilization: Optional[float] = None
-    disk_usage_percent: float = 0.0
-    network_io: Optional[Tuple[float, float]] = None
+class Alert:
+    """Performance alert."""
+    alert_id: str
+    level: AlertLevel
+    metric_type: MetricType
+    message: str
+    value: float
+    threshold: float
+    timestamp: float
+    resolved: bool = False
+    resolved_at: Optional[float] = None
 
 
 @dataclass
-class MonitoringConfig:
-    """Configuration for performance monitoring."""
-    save_performance_data: bool = True
-    performance_data_path: str = "performance_data"
-    log_interval: float = 60.0  # seconds
-    metrics_history_size: int = 1000
-    enable_system_monitoring: bool = True
-    enable_gpu_monitoring: bool = True
-    enable_detailed_logging: bool = True
-    alert_thresholds: Dict[str, float] = field(default_factory=lambda: {
-        "inference_time_ms": 1000.0,
-        "error_rate": 0.1,
-        "memory_usage_percent": 90.0,
-        "cpu_usage_percent": 90.0
-    })
+class PerformanceReport:
+    """Comprehensive performance report."""
+    report_id: str
+    start_time: float
+    end_time: float
+    duration: float
+    metrics: Dict[MetricType, Dict[str, Any]]
+    alerts: List[Alert]
+    recommendations: List[str]
+    overall_health: str
 
 
-class PerformanceMonitor:
+class MetricsCollector:
     """
-    Monitors and tracks model performance metrics.
-    
-    Provides comprehensive performance tracking including inference times,
-    accuracy metrics, system resources, and alerting capabilities.
+    Comprehensive metrics collector for performance monitoring.
+    Tracks system performance, model performance, and optimization metrics.
     """
     
-    def __init__(self, config: Optional[MonitoringConfig] = None):
-        """
-        Initialize the performance monitor.
+    def __init__(self, max_history: int = 10000):
+        self.max_history = max_history
+        self.logger = logging.getLogger(f"{__name__}.MetricsCollector")
         
-        Args:
-            config: Monitoring configuration
-        """
-        self.config = config or MonitoringConfig()
-        self.logger = logging.getLogger(f"{__name__}.PerformanceMonitor")
-        
-        # Performance tracking
-        self.metrics: Dict[str, PerformanceMetrics] = defaultdict(lambda: PerformanceMetrics(""))
-        self.timers: Dict[str, float] = {}
-        self.metrics_history: Dict[str, deque] = defaultdict(lambda: deque(maxlen=self.config.metrics_history_size))
-        
-        # System monitoring
-        self.system_metrics_history: deque = deque(maxlen=self.config.metrics_history_size)
-        self.last_system_check = 0.0
-        
-        # Create performance data directory
-        if self.config.save_performance_data:
-            self.performance_dir = Path(self.config.performance_data_path)
-            self.performance_dir.mkdir(exist_ok=True)
-        
-        # Initialize GPU monitoring
-        self.gpu_available = torch.cuda.is_available()
-        
-        self.logger.info(f"Performance monitor initialized with config: {self.config}")
-    
-    def start_timer(self, model_name: str) -> None:
-        """
-        Start timing inference for a model.
-        
-        Args:
-            model_name: Name of the model being timed
-        """
-        self.timers[model_name] = time.time()
-    
-    def end_timer(self, model_name: str) -> float:
-        """
-        End timing inference for a model.
-        
-        Args:
-            model_name: Name of the model being timed
-            
-        Returns:
-            Inference time in seconds
-        """
-        if model_name not in self.timers:
-            self.logger.warning(f"No timer found for model '{model_name}'")
-            return 0.0
-        
-        inference_time = time.time() - self.timers[model_name]
-        del self.timers[model_name]
-        
-        # Update metrics
-        self._update_inference_metrics(model_name, inference_time)
-        
-        return inference_time
-    
-    def _update_inference_metrics(self, model_name: str, inference_time: float) -> None:
-        """Update inference metrics for a model."""
-        metrics = self.metrics[model_name]
-        metrics.model_name = model_name
-        metrics.inference_count += 1
-        metrics.total_inference_time += inference_time
-        metrics.average_inference_time = metrics.total_inference_time / metrics.inference_count
-        metrics.min_inference_time = min(metrics.min_inference_time, inference_time)
-        metrics.max_inference_time = max(metrics.max_inference_time, inference_time)
-        metrics.throughput_fps = 1.0 / metrics.average_inference_time if metrics.average_inference_time > 0 else 0
-        metrics.last_updated = time.time()
-        
-        # Add to history
-        self.metrics_history[model_name].append({
-            "timestamp": time.time(),
-            "inference_time": inference_time,
-            "throughput_fps": metrics.throughput_fps
-        })
-    
-    def record_accuracy(self, model_name: str, accuracy: float) -> None:
-        """
-        Record accuracy for a model.
-        
-        Args:
-            model_name: Name of the model
-            accuracy: Accuracy value (0.0 to 1.0)
-        """
-        if model_name in self.metrics:
-            self.metrics[model_name].accuracy = accuracy
-    
-    def record_precision_recall(self, model_name: str, precision: float, recall: float) -> None:
-        """
-        Record precision and recall for a model.
-        
-        Args:
-            model_name: Name of the model
-            precision: Precision value (0.0 to 1.0)
-            recall: Recall value (0.0 to 1.0)
-        """
-        if model_name in self.metrics:
-            metrics = self.metrics[model_name]
-            metrics.precision = precision
-            metrics.recall = recall
-            # Calculate F1 score
-            if precision + recall > 0:
-                metrics.f1_score = 2 * (precision * recall) / (precision + recall)
-    
-    def record_success(self, model_name: str, success: bool) -> None:
-        """
-        Record success/failure for a model.
-        
-        Args:
-            model_name: Name of the model
-            success: Whether the inference was successful
-        """
-        if model_name in self.metrics:
-            metrics = self.metrics[model_name]
-            if not success:
-                metrics.error_count += 1
-            
-            total_attempts = metrics.inference_count + metrics.error_count
-            if total_attempts > 0:
-                metrics.success_rate = metrics.inference_count / total_attempts
-    
-    def get_performance_report(self) -> Dict[str, Any]:
-        """
-        Get comprehensive performance report.
-        
-        Returns:
-            Dictionary containing performance statistics
-        """
-        report = {
-            "timestamp": time.time(),
-            "models": {},
-            "system": self._get_system_metrics(),
-            "summary": {}
+        # Metric storage
+        self.metrics: Dict[MetricType, deque] = {
+            metric_type: deque(maxlen=max_history) 
+            for metric_type in MetricType
         }
         
-        # Model-specific metrics
-        for model_name, metrics in self.metrics.items():
-            report["models"][model_name] = {
-                "inference_count": metrics.inference_count,
-                "total_inference_time": metrics.total_inference_time,
-                "average_inference_time": metrics.average_inference_time,
-                "min_inference_time": metrics.min_inference_time,
-                "max_inference_time": metrics.max_inference_time,
-                "throughput_fps": metrics.throughput_fps,
-                "accuracy": metrics.accuracy,
-                "precision": metrics.precision,
-                "recall": metrics.recall,
-                "f1_score": metrics.f1_score,
-                "error_count": metrics.error_count,
-                "success_rate": metrics.success_rate,
-                "last_updated": metrics.last_updated
-            }
+        # Performance tracking
+        self.total_requests = 0
+        self.total_processing_time = 0.0
+        self.total_errors = 0
+        self.model_performance_history: Dict[str, List[float]] = defaultdict(list)
+        self.ensemble_performance_history: List[float] = []
         
-        # Summary statistics
-        if self.metrics:
-            all_inference_times = [m.average_inference_time for m in self.metrics.values()]
-            all_throughputs = [m.throughput_fps for m in self.metrics.values()]
-            all_accuracies = [m.accuracy for m in self.metrics.values()]
-            
-            report["summary"] = {
-                "total_models": len(self.metrics),
-                "avg_inference_time": np.mean(all_inference_times),
-                "avg_throughput": np.mean(all_throughputs),
-                "avg_accuracy": np.mean(all_accuracies),
-                "best_model": max(self.metrics.keys(), key=lambda k: self.metrics[k].accuracy),
-                "fastest_model": min(self.metrics.keys(), key=lambda k: self.metrics[k].average_inference_time)
-            }
+        # System monitoring
+        self.system_metrics = {
+            'cpu_percent': deque(maxlen=1000),
+            'memory_percent': deque(maxlen=1000),
+            'gpu_memory_percent': deque(maxlen=1000),
+            'disk_io': deque(maxlen=1000)
+        }
         
-        return report
+        # Start background monitoring
+        self.monitoring_active = True
+        self.monitoring_thread = threading.Thread(target=self._monitor_system, daemon=True)
+        self.monitoring_thread.start()
+        
+        self.logger.info("MetricsCollector initialized with background monitoring")
     
-    def _get_system_metrics(self) -> SystemMetrics:
-        """Get current system metrics."""
-        current_time = time.time()
+    def record_metric(self, metric_type: MetricType, value: float, 
+                     metadata: Dict[str, Any] = None, tags: Dict[str, str] = None):
+        """Record a performance metric."""
+        metric_data = MetricData(
+            metric_type=metric_type,
+            value=value,
+            timestamp=time.time(),
+            metadata=metadata or {},
+            tags=tags or {}
+        )
         
-        # Check if we need to update system metrics
-        if (current_time - self.last_system_check) < self.config.log_interval:
-            if self.system_metrics_history:
-                return self.system_metrics_history[-1]
+        self.metrics[metric_type].append(metric_data)
         
-        self.last_system_check = current_time
+        # Update aggregated metrics
+        self._update_aggregated_metrics(metric_type, value, metadata)
+    
+    def record_request(self, processing_time: float, success: bool, 
+                      model_results: Dict[str, DetectionResult] = None,
+                      metadata: Dict[str, Any] = None):
+        """Record a complete request processing."""
+        self.total_requests += 1
+        self.total_processing_time += processing_time
         
-        metrics = SystemMetrics(timestamp=current_time)
+        if not success:
+            self.total_errors += 1
         
-        try:
-            # CPU and memory
-            metrics.cpu_percent = psutil.cpu_percent(interval=0.1)
-            metrics.memory_percent = psutil.virtual_memory().percent
-            metrics.disk_usage_percent = psutil.disk_usage('/').percent
-            
-            # Network I/O
-            net_io = psutil.net_io_counters()
-            metrics.network_io = (net_io.bytes_sent, net_io.bytes_recv)
-            
-            # GPU metrics
-            if self.config.enable_gpu_monitoring and self.gpu_available:
+        # Record latency
+        self.record_metric(MetricType.LATENCY, processing_time, metadata)
+        
+        # Record throughput (requests per second)
+        if self.total_requests > 0:
+            avg_processing_time = self.total_processing_time / self.total_requests
+            throughput = 1.0 / avg_processing_time if avg_processing_time > 0 else 0
+            self.record_metric(MetricType.THROUGHPUT, throughput, metadata)
+        
+        # Record model performance
+        if model_results:
+            for model_name, result in model_results.items():
+                self.model_performance_history[model_name].append(result.confidence)
+                self.record_metric(
+                    MetricType.MODEL_PERFORMANCE, 
+                    result.confidence,
+                    {"model_name": model_name, "inference_time": result.inference_time}
+                )
+        
+        # Record error rate
+        error_rate = (self.total_errors / self.total_requests) * 100 if self.total_requests > 0 else 0
+        self.record_metric(MetricType.ERROR_RATE, error_rate, metadata)
+    
+    def record_ensemble_performance(self, accuracy: float, efficiency: float, 
+                                  metadata: Dict[str, Any] = None):
+        """Record ensemble performance metrics."""
+        self.ensemble_performance_history.append(accuracy)
+        self.record_metric(MetricType.ACCURACY, accuracy, metadata)
+        self.record_metric(MetricType.ENSEMBLE_EFFICIENCY, efficiency, metadata)
+    
+    def record_cache_performance(self, hit_rate: float, metadata: Dict[str, Any] = None):
+        """Record cache performance metrics."""
+        self.record_metric(MetricType.CACHE_HIT_RATE, hit_rate, metadata)
+    
+    def _update_aggregated_metrics(self, metric_type: MetricType, value: float, metadata: Dict[str, Any]):
+        """Update aggregated metrics based on new data."""
+        # This could include more sophisticated aggregation logic
+        pass
+    
+    def _monitor_system(self):
+        """Background system monitoring thread."""
+        while self.monitoring_active:
+            try:
+                # CPU usage
+                cpu_percent = psutil.cpu_percent(interval=1)
+                self.system_metrics['cpu_percent'].append(cpu_percent)
+                self.record_metric(MetricType.CPU, cpu_percent, {"type": "cpu_percent"})
+                
+                # Memory usage
+                memory = psutil.virtual_memory()
+                memory_percent = memory.percent
+                self.system_metrics['memory_percent'].append(memory_percent)
+                self.record_metric(MetricType.MEMORY, memory_percent, {
+                    "type": "memory_percent",
+                    "available_gb": memory.available / (1024**3),
+                    "used_gb": memory.used / (1024**3)
+                })
+                
+                # GPU monitoring (if available)
                 try:
-                    import pynvml
-                    pynvml.nvmlInit()
-                    handle = pynvml.nvmlDeviceGetHandleByIndex(0)
-                    
-                    memory_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
-                    metrics.gpu_memory_used = memory_info.used / 1024**3  # GB
-                    metrics.gpu_memory_total = memory_info.total / 1024**3  # GB
-                    
-                    utilization = pynvml.nvmlDeviceGetUtilizationRates(handle)
-                    metrics.gpu_utilization = utilization.gpu
-                    
+                    import torch
+                    if torch.cuda.is_available():
+                        gpu_memory = torch.cuda.memory_allocated() / torch.cuda.max_memory_allocated() * 100
+                        self.system_metrics['gpu_memory_percent'].append(gpu_memory)
+                        self.record_metric(MetricType.GPU, gpu_memory, {"type": "gpu_memory_percent"})
                 except ImportError:
-                    self.logger.warning("pynvml not available for GPU monitoring")
-                except Exception as e:
-                    self.logger.warning(f"GPU monitoring failed: {str(e)}")
-            
-            # Add to history
-            self.system_metrics_history.append(metrics)
-            
-        except Exception as e:
-            self.logger.error(f"Failed to get system metrics: {str(e)}")
-        
-        return metrics
+                    pass
+                
+                time.sleep(5)  # Monitor every 5 seconds
+                
+            except Exception as e:
+                self.logger.error(f"System monitoring error: {str(e)}")
+                time.sleep(10)  # Wait longer on error
     
-    def save_performance_data(self, filename: Optional[str] = None) -> bool:
-        """
-        Save performance data to file.
+    def get_metric_summary(self, metric_type: MetricType, 
+                          duration_minutes: int = 60) -> Dict[str, Any]:
+        """Get summary statistics for a metric type."""
+        cutoff_time = time.time() - (duration_minutes * 60)
         
-        Args:
-            filename: Optional filename, defaults to timestamp-based name
-            
-        Returns:
-            True if saved successfully, False otherwise
-        """
-        if not self.config.save_performance_data:
-            return False
-        
-        try:
-            if filename is None:
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"performance_report_{timestamp}.json"
-            
-            filepath = self.performance_dir / filename
-            
-            report = self.get_performance_report()
-            
-            # Convert to JSON-serializable format
-            json_report = self._convert_to_json_serializable(report)
-            
-            with open(filepath, 'w') as f:
-                json.dump(json_report, f, indent=2, default=str)
-            
-            self.logger.info(f"Performance data saved to {filepath}")
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Failed to save performance data: {str(e)}")
-            return False
-    
-    def _convert_to_json_serializable(self, obj: Any) -> Any:
-        """Convert object to JSON-serializable format."""
-        if isinstance(obj, dict):
-            return {k: self._convert_to_json_serializable(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [self._convert_to_json_serializable(item) for item in obj]
-        elif isinstance(obj, (np.integer, np.floating)):
-            return obj.item()
-        elif isinstance(obj, np.ndarray):
-            return obj.tolist()
-        elif hasattr(obj, '__dict__'):
-            return self._convert_to_json_serializable(obj.__dict__)
-        else:
-            return obj
-    
-    def check_alerts(self) -> List[Dict[str, Any]]:
-        """
-        Check for performance alerts based on thresholds.
-        
-        Returns:
-            List of alert dictionaries
-        """
-        alerts = []
-        
-        # Check model performance
-        for model_name, metrics in self.metrics.items():
-            # Inference time alert
-            if metrics.average_inference_time * 1000 > self.config.alert_thresholds.get("inference_time_ms", 1000):
-                alerts.append({
-                    "type": "high_inference_time",
-                    "model": model_name,
-                    "value": metrics.average_inference_time * 1000,
-                    "threshold": self.config.alert_thresholds["inference_time_ms"],
-                    "timestamp": time.time()
-                })
-            
-            # Error rate alert
-            if metrics.success_rate < (1 - self.config.alert_thresholds.get("error_rate", 0.1)):
-                alerts.append({
-                    "type": "high_error_rate",
-                    "model": model_name,
-                    "value": 1 - metrics.success_rate,
-                    "threshold": self.config.alert_thresholds["error_rate"],
-                    "timestamp": time.time()
-                })
-        
-        # Check system metrics
-        system_metrics = self._get_system_metrics()
-        
-        # Memory usage alert
-        if system_metrics.memory_percent > self.config.alert_thresholds.get("memory_usage_percent", 90):
-            alerts.append({
-                "type": "high_memory_usage",
-                "value": system_metrics.memory_percent,
-                "threshold": self.config.alert_thresholds["memory_usage_percent"],
-                "timestamp": time.time()
-            })
-        
-        # CPU usage alert
-        if system_metrics.cpu_percent > self.config.alert_thresholds.get("cpu_usage_percent", 90):
-            alerts.append({
-                "type": "high_cpu_usage",
-                "value": system_metrics.cpu_percent,
-                "threshold": self.config.alert_thresholds["cpu_usage_percent"],
-                "timestamp": time.time()
-            })
-        
-        return alerts
-    
-    def get_model_performance(self, model_name: str) -> Optional[PerformanceMetrics]:
-        """Get performance metrics for a specific model."""
-        return self.metrics.get(model_name)
-    
-    def reset_metrics(self, model_name: Optional[str] = None) -> None:
-        """
-        Reset performance metrics.
-        
-        Args:
-            model_name: Specific model to reset, or None to reset all
-        """
-        if model_name is None:
-            self.metrics.clear()
-            self.metrics_history.clear()
-            self.logger.info("Reset all performance metrics")
-        else:
-            self.metrics.pop(model_name, None)
-            self.metrics_history.pop(model_name, None)
-            self.logger.info(f"Reset performance metrics for model '{model_name}'")
-    
-    def get_metrics_history(self, model_name: str, hours: int = 24) -> List[Dict[str, Any]]:
-        """
-        Get historical metrics for a model.
-        
-        Args:
-            model_name: Name of the model
-            hours: Number of hours of history to retrieve
-            
-        Returns:
-            List of historical metrics
-        """
-        if model_name not in self.metrics_history:
-            return []
-        
-        cutoff_time = time.time() - (hours * 3600)
-        history = list(self.metrics_history[model_name])
-        
-        # Filter by time
-        filtered_history = [
-            entry for entry in history
-            if entry["timestamp"] >= cutoff_time
+        # Filter metrics by time
+        recent_metrics = [
+            m for m in self.metrics[metric_type] 
+            if m.timestamp >= cutoff_time
         ]
         
-        return filtered_history
-    
-    def export_metrics_csv(self, filename: Optional[str] = None) -> bool:
-        """
-        Export metrics to CSV format.
+        if not recent_metrics:
+            return {"count": 0, "avg": 0, "min": 0, "max": 0, "std": 0}
         
-        Args:
-            filename: Optional filename
+        values = [m.value for m in recent_metrics]
+        
+        return {
+            "count": len(values),
+            "avg": statistics.mean(values),
+            "min": min(values),
+            "max": max(values),
+            "std": statistics.stdev(values) if len(values) > 1 else 0,
+            "latest": values[-1] if values else 0,
+            "trend": self._calculate_trend(values)
+        }
+    
+    def _calculate_trend(self, values: List[float]) -> str:
+        """Calculate trend direction for a series of values."""
+        if len(values) < 2:
+            return "stable"
+        
+        # Simple linear trend calculation
+        x = list(range(len(values)))
+        slope = np.polyfit(x, values, 1)[0]
+        
+        if slope > 0.1:
+            return "increasing"
+        elif slope < -0.1:
+            return "decreasing"
+        else:
+            return "stable"
+    
+    def get_performance_report(self, duration_minutes: int = 60) -> PerformanceReport:
+        """Generate comprehensive performance report."""
+        start_time = time.time() - (duration_minutes * 60)
+        end_time = time.time()
+        
+        # Collect all metrics
+        metrics_summary = {}
+        for metric_type in MetricType:
+            metrics_summary[metric_type.value] = self.get_metric_summary(metric_type, duration_minutes)
+        
+        # Generate recommendations
+        recommendations = self._generate_recommendations(metrics_summary)
+        
+        # Calculate overall health
+        overall_health = self._calculate_overall_health(metrics_summary)
+        
+        return PerformanceReport(
+            report_id=f"report_{int(time.time())}",
+            start_time=start_time,
+            end_time=end_time,
+            duration=duration_minutes * 60,
+            metrics=metrics_summary,
+            alerts=[],  # Will be populated by AlertingSystem
+            recommendations=recommendations,
+            overall_health=overall_health
+        )
+    
+    def _generate_recommendations(self, metrics_summary: Dict[str, Any]) -> List[str]:
+        """Generate performance optimization recommendations."""
+        recommendations = []
+        
+        # Check latency
+        latency = metrics_summary.get('latency', {})
+        if latency.get('avg', 0) > 1.0:  # > 1 second
+            recommendations.append("High latency detected. Consider enabling parallel processing or model warmup.")
+        
+        # Check throughput
+        throughput = metrics_summary.get('throughput', {})
+        if throughput.get('avg', 0) < 1.0:  # < 1 request per second
+            recommendations.append("Low throughput detected. Consider optimizing preprocessing or increasing concurrency.")
+        
+        # Check error rate
+        error_rate = metrics_summary.get('error_rate', {})
+        if error_rate.get('avg', 0) > 5.0:  # > 5% error rate
+            recommendations.append("High error rate detected. Check model stability and resource allocation.")
+        
+        # Check memory usage
+        memory = metrics_summary.get('memory', {})
+        if memory.get('avg', 0) > 80.0:  # > 80% memory usage
+            recommendations.append("High memory usage detected. Consider enabling garbage collection or reducing batch sizes.")
+        
+        # Check CPU usage
+        cpu = metrics_summary.get('cpu', {})
+        if cpu.get('avg', 0) > 90.0:  # > 90% CPU usage
+            recommendations.append("High CPU usage detected. Consider scaling horizontally or optimizing algorithms.")
+        
+        return recommendations
+    
+    def _calculate_overall_health(self, metrics_summary: Dict[str, Any]) -> str:
+        """Calculate overall system health score."""
+        health_score = 100
+        
+        # Penalize for high latency
+        latency = metrics_summary.get('latency', {})
+        if latency.get('avg', 0) > 2.0:
+            health_score -= 30
+        elif latency.get('avg', 0) > 1.0:
+            health_score -= 15
+        
+        # Penalize for high error rate
+        error_rate = metrics_summary.get('error_rate', {})
+        if error_rate.get('avg', 0) > 10.0:
+            health_score -= 40
+        elif error_rate.get('avg', 0) > 5.0:
+            health_score -= 20
+        
+        # Penalize for high resource usage
+        memory = metrics_summary.get('memory', {})
+        if memory.get('avg', 0) > 90.0:
+            health_score -= 20
+        elif memory.get('avg', 0) > 80.0:
+            health_score -= 10
+        
+        cpu = metrics_summary.get('cpu', {})
+        if cpu.get('avg', 0) > 95.0:
+            health_score -= 20
+        elif cpu.get('avg', 0) > 85.0:
+            health_score -= 10
+        
+        if health_score >= 90:
+            return "excellent"
+        elif health_score >= 70:
+            return "good"
+        elif health_score >= 50:
+            return "fair"
+        else:
+            return "poor"
+    
+    def get_model_performance_stats(self) -> Dict[str, Any]:
+        """Get performance statistics for individual models."""
+        stats = {}
+        
+        for model_name, performances in self.model_performance_history.items():
+            if performances:
+                stats[model_name] = {
+                    "count": len(performances),
+                    "avg_confidence": statistics.mean(performances),
+                    "min_confidence": min(performances),
+                    "max_confidence": max(performances),
+                    "std_confidence": statistics.stdev(performances) if len(performances) > 1 else 0
+                }
+        
+        return stats
+    
+    def export_metrics(self, filepath: str, duration_minutes: int = 60):
+        """Export metrics to JSON file."""
+        cutoff_time = time.time() - (duration_minutes * 60)
+        
+        export_data = {
+            "export_time": time.time(),
+            "duration_minutes": duration_minutes,
+            "metrics": {},
+            "system_metrics": {k: list(v) for k, v in self.system_metrics.items()},
+            "model_performance": self.get_model_performance_stats()
+        }
+        
+        for metric_type, metrics in self.metrics.items():
+            recent_metrics = [
+                {
+                    "value": m.value,
+                    "timestamp": m.timestamp,
+                    "metadata": m.metadata,
+                    "tags": m.tags
+                }
+                for m in metrics if m.timestamp >= cutoff_time
+            ]
+            export_data["metrics"][metric_type.value] = recent_metrics
+        
+        with open(filepath, 'w') as f:
+            json.dump(export_data, f, indent=2)
+        
+        self.logger.info(f"Metrics exported to {filepath}")
+    
+    def cleanup(self):
+        """Clean up resources and stop monitoring."""
+        self.monitoring_active = False
+        if self.monitoring_thread.is_alive():
+            self.monitoring_thread.join(timeout=5)
+        self.logger.info("MetricsCollector cleaned up")
+
+
+class AlertingSystem:
+    """
+    Performance alerting system that monitors metrics and generates alerts
+    when thresholds are exceeded.
+    """
+    
+    def __init__(self, metrics_collector: MetricsCollector):
+        self.metrics_collector = metrics_collector
+        self.logger = logging.getLogger(f"{__name__}.AlertingSystem")
+        
+        # Alert thresholds
+        self.thresholds = {
+            MetricType.LATENCY: {"warning": 1.0, "error": 2.0, "critical": 5.0},
+            MetricType.THROUGHPUT: {"warning": 0.5, "error": 0.2, "critical": 0.1},
+            MetricType.ERROR_RATE: {"warning": 5.0, "error": 10.0, "critical": 20.0},
+            MetricType.MEMORY: {"warning": 80.0, "error": 90.0, "critical": 95.0},
+            MetricType.CPU: {"warning": 85.0, "error": 95.0, "critical": 98.0},
+            MetricType.GPU: {"warning": 85.0, "error": 95.0, "critical": 98.0}
+        }
+        
+        # Active alerts
+        self.active_alerts: Dict[str, Alert] = {}
+        self.alert_history: List[Alert] = []
+        
+        # Alert callbacks
+        self.alert_callbacks: List[Callable[[Alert], None]] = []
+        
+        # Start monitoring
+        self.monitoring_active = True
+        self.monitoring_thread = threading.Thread(target=self._monitor_alerts, daemon=True)
+        self.monitoring_thread.start()
+        
+        self.logger.info("AlertingSystem initialized")
+    
+    def add_alert_callback(self, callback: Callable[[Alert], None]):
+        """Add callback function for alert notifications."""
+        self.alert_callbacks.append(callback)
+    
+    def set_threshold(self, metric_type: MetricType, level: str, value: float):
+        """Set alert threshold for a metric type."""
+        if metric_type not in self.thresholds:
+            self.thresholds[metric_type] = {}
+        
+        self.thresholds[metric_type][level] = value
+        self.logger.info(f"Set {metric_type.value} {level} threshold to {value}")
+    
+    def _monitor_alerts(self):
+        """Background alert monitoring thread."""
+        while self.monitoring_active:
+            try:
+                self._check_alerts()
+                time.sleep(10)  # Check every 10 seconds
+            except Exception as e:
+                self.logger.error(f"Alert monitoring error: {str(e)}")
+                time.sleep(30)  # Wait longer on error
+    
+    def _check_alerts(self):
+        """Check all metrics for threshold violations."""
+        for metric_type in self.thresholds:
+            if metric_type not in self.metrics_collector.metrics:
+                continue
             
-        Returns:
-            True if exported successfully, False otherwise
-        """
-        try:
-            if filename is None:
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"metrics_export_{timestamp}.csv"
+            # Get latest metric value
+            metrics = self.metrics_collector.metrics[metric_type]
+            if not metrics:
+                continue
             
-            filepath = self.performance_dir / filename
+            latest_metric = metrics[-1]
+            value = latest_metric.value
+            thresholds = self.thresholds[metric_type]
             
-            import csv
-            
-            with open(filepath, 'w', newline='') as csvfile:
-                fieldnames = [
-                    'model_name', 'timestamp', 'inference_count', 'avg_inference_time',
-                    'throughput_fps', 'accuracy', 'precision', 'recall', 'f1_score',
-                    'error_count', 'success_rate'
-                ]
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                writer.writeheader()
+            # Check each threshold level
+            for level, threshold in thresholds.items():
+                if value >= threshold:
+                    alert_id = f"{metric_type.value}_{level}_{int(latest_metric.timestamp)}"
+                    
+                    # Check if alert already exists
+                    if alert_id not in self.active_alerts:
+                        alert = Alert(
+                            alert_id=alert_id,
+                            level=AlertLevel(level),
+                            metric_type=metric_type,
+                            message=f"{metric_type.value} exceeded {level} threshold: {value:.2f} >= {threshold}",
+                            value=value,
+                            threshold=threshold,
+                            timestamp=latest_metric.timestamp
+                        )
+                        
+                        self.active_alerts[alert_id] = alert
+                        self.alert_history.append(alert)
+                        
+                        # Notify callbacks
+                        for callback in self.alert_callbacks:
+                            try:
+                                callback(alert)
+                            except Exception as e:
+                                self.logger.error(f"Alert callback error: {str(e)}")
+                        
+                        self.logger.warning(f"Alert triggered: {alert.message}")
+    
+    def resolve_alert(self, alert_id: str):
+        """Resolve an active alert."""
+        if alert_id in self.active_alerts:
+            alert = self.active_alerts[alert_id]
+            alert.resolved = True
+            alert.resolved_at = time.time()
+            del self.active_alerts[alert_id]
+            self.logger.info(f"Alert resolved: {alert_id}")
+    
+    def get_active_alerts(self) -> List[Alert]:
+        """Get list of active alerts."""
+        return list(self.active_alerts.values())
+    
+    def get_alert_history(self, hours: int = 24) -> List[Alert]:
+        """Get alert history for specified hours."""
+        cutoff_time = time.time() - (hours * 3600)
+        return [alert for alert in self.alert_history if alert.timestamp >= cutoff_time]
+    
+    def cleanup(self):
+        """Clean up resources and stop monitoring."""
+        self.monitoring_active = False
+        if self.monitoring_thread.is_alive():
+            self.monitoring_thread.join(timeout=5)
+        self.logger.info("AlertingSystem cleaned up")
+
+
+class AutoOptimizationEngine:
+    """
+    Automatic optimization engine that continuously tunes system parameters
+    based on performance metrics and alerts.
+    """
+    
+    def __init__(self, metrics_collector: MetricsCollector, alerting_system: AlertingSystem):
+        self.metrics_collector = metrics_collector
+        self.alerting_system = alerting_system
+        self.logger = logging.getLogger(f"{__name__}.AutoOptimizationEngine")
+        
+        # Optimization parameters
+        self.optimization_enabled = True
+        self.optimization_interval = 300  # 5 minutes
+        self.last_optimization = 0
+        
+        # Optimization history
+        self.optimization_history: List[Dict[str, Any]] = []
+        
+        # Start optimization loop
+        self.optimization_active = True
+        self.optimization_thread = threading.Thread(target=self._optimization_loop, daemon=True)
+        self.optimization_thread.start()
+        
+        self.logger.info("AutoOptimizationEngine initialized")
+    
+    def _optimization_loop(self):
+        """Main optimization loop."""
+        while self.optimization_active:
+            try:
+                if self.optimization_enabled:
+                    current_time = time.time()
+                    if current_time - self.last_optimization >= self.optimization_interval:
+                        self._perform_optimization()
+                        self.last_optimization = current_time
                 
-                for model_name, metrics in self.metrics.items():
-                    writer.writerow({
-                        'model_name': model_name,
-                        'timestamp': datetime.fromtimestamp(metrics.last_updated).isoformat(),
-                        'inference_count': metrics.inference_count,
-                        'avg_inference_time': metrics.average_inference_time,
-                        'throughput_fps': metrics.throughput_fps,
-                        'accuracy': metrics.accuracy,
-                        'precision': metrics.precision,
-                        'recall': metrics.recall,
-                        'f1_score': metrics.f1_score,
-                        'error_count': metrics.error_count,
-                        'success_rate': metrics.success_rate
-                    })
+                time.sleep(60)  # Check every minute
+            except Exception as e:
+                self.logger.error(f"Optimization loop error: {str(e)}")
+                time.sleep(300)  # Wait 5 minutes on error
+    
+    def _perform_optimization(self):
+        """Perform automatic optimization based on current metrics."""
+        try:
+            # Get recent performance report
+            report = self.metrics_collector.get_performance_report(duration_minutes=30)
             
-            self.logger.info(f"Metrics exported to CSV: {filepath}")
-            return True
+            # Get active alerts
+            active_alerts = self.alerting_system.get_active_alerts()
             
+            optimizations = []
+            
+            # Optimize based on latency
+            latency_metrics = report.metrics.get('latency', {})
+            if latency_metrics.get('avg', 0) > 1.0:
+                optimizations.append({
+                    "type": "enable_parallel_processing",
+                    "reason": "High latency detected",
+                    "priority": "high"
+                })
+            
+            # Optimize based on memory usage
+            memory_metrics = report.metrics.get('memory', {})
+            if memory_metrics.get('avg', 0) > 85.0:
+                optimizations.append({
+                    "type": "reduce_batch_size",
+                    "reason": "High memory usage",
+                    "priority": "medium"
+                })
+            
+            # Optimize based on error rate
+            error_metrics = report.metrics.get('error_rate', {})
+            if error_metrics.get('avg', 0) > 5.0:
+                optimizations.append({
+                    "type": "enable_model_warmup",
+                    "reason": "High error rate",
+                    "priority": "high"
+                })
+            
+            # Record optimization attempt
+            optimization_record = {
+                "timestamp": time.time(),
+                "optimizations": optimizations,
+                "performance_before": {
+                    "latency": latency_metrics.get('avg', 0),
+                    "memory": memory_metrics.get('avg', 0),
+                    "error_rate": error_metrics.get('avg', 0)
+                }
+            }
+            
+            self.optimization_history.append(optimization_record)
+            
+            if optimizations:
+                self.logger.info(f"Auto-optimization suggested {len(optimizations)} optimizations")
+                for opt in optimizations:
+                    self.logger.info(f"  - {opt['type']}: {opt['reason']} (priority: {opt['priority']})")
+            else:
+                self.logger.info("No optimizations needed")
+                
         except Exception as e:
-            self.logger.error(f"Failed to export metrics to CSV: {str(e)}")
-            return False 
+            self.logger.error(f"Optimization error: {str(e)}")
+    
+    def get_optimization_history(self, hours: int = 24) -> List[Dict[str, Any]]:
+        """Get optimization history for specified hours."""
+        cutoff_time = time.time() - (hours * 3600)
+        return [opt for opt in self.optimization_history if opt['timestamp'] >= cutoff_time]
+    
+    def enable_optimization(self):
+        """Enable automatic optimization."""
+        self.optimization_enabled = True
+        self.logger.info("Auto-optimization enabled")
+    
+    def disable_optimization(self):
+        """Disable automatic optimization."""
+        self.optimization_enabled = False
+        self.logger.info("Auto-optimization disabled")
+    
+    def cleanup(self):
+        """Clean up resources and stop optimization."""
+        self.optimization_active = False
+        if self.optimization_thread.is_alive():
+            self.optimization_thread.join(timeout=5)
+        self.logger.info("AutoOptimizationEngine cleaned up")
+
+
+class PerformanceMonitoringManager:
+    """
+    High-level manager for performance monitoring, alerting, and optimization.
+    Coordinates all monitoring components and provides unified interface.
+    """
+    
+    def __init__(self):
+        self.metrics_collector = MetricsCollector()
+        self.alerting_system = AlertingSystem(self.metrics_collector)
+        self.auto_optimization = AutoOptimizationEngine(self.metrics_collector, self.alerting_system)
+        self.logger = logging.getLogger(f"{__name__}.PerformanceMonitoringManager")
+        
+        self.logger.info("PerformanceMonitoringManager initialized")
+    
+    def record_request(self, processing_time: float, success: bool, 
+                      model_results: Dict[str, DetectionResult] = None,
+                      metadata: Dict[str, Any] = None):
+        """Record a request for monitoring."""
+        self.metrics_collector.record_request(processing_time, success, model_results, metadata)
+    
+    def get_dashboard_data(self) -> Dict[str, Any]:
+        """Get data for performance dashboard."""
+        report = self.metrics_collector.get_performance_report(duration_minutes=60)
+        active_alerts = self.alerting_system.get_active_alerts()
+        model_stats = self.metrics_collector.get_model_performance_stats()
+        
+        return {
+            "overall_health": report.overall_health,
+            "metrics": report.metrics,
+            "active_alerts": [
+                {
+                    "id": alert.alert_id,
+                    "level": alert.level.value,
+                    "message": alert.message,
+                    "timestamp": alert.timestamp
+                }
+                for alert in active_alerts
+            ],
+            "model_performance": model_stats,
+            "recommendations": report.recommendations,
+            "system_info": {
+                "total_requests": self.metrics_collector.total_requests,
+                "total_errors": self.metrics_collector.total_errors,
+                "uptime": time.time() - self.metrics_collector.metrics[MetricType.LATENCY][0].timestamp if self.metrics_collector.metrics[MetricType.LATENCY] else 0
+            }
+        }
+    
+    def export_performance_data(self, filepath: str, duration_minutes: int = 60):
+        """Export comprehensive performance data."""
+        self.metrics_collector.export_metrics(filepath, duration_minutes)
+        
+        # Add alert data
+        alert_data = {
+            "active_alerts": [
+                {
+                    "id": alert.alert_id,
+                    "level": alert.level.value,
+                    "metric_type": alert.metric_type.value,
+                    "message": alert.message,
+                    "value": alert.value,
+                    "threshold": alert.threshold,
+                    "timestamp": alert.timestamp,
+                    "resolved": alert.resolved
+                }
+                for alert in self.alerting_system.get_active_alerts()
+            ],
+            "alert_history": [
+                {
+                    "id": alert.alert_id,
+                    "level": alert.level.value,
+                    "metric_type": alert.metric_type.value,
+                    "message": alert.message,
+                    "value": alert.value,
+                    "threshold": alert.threshold,
+                    "timestamp": alert.timestamp,
+                    "resolved": alert.resolved,
+                    "resolved_at": alert.resolved_at
+                }
+                for alert in self.alerting_system.get_alert_history(24)
+            ]
+        }
+        
+        # Append alert data to existing file
+        try:
+            with open(filepath, 'r') as f:
+                data = json.load(f)
+            data.update(alert_data)
+        except (FileNotFoundError, json.JSONDecodeError):
+            data = alert_data
+        
+        with open(filepath, 'w') as f:
+            json.dump(data, f, indent=2)
+        
+        self.logger.info(f"Performance data exported to {filepath}")
+    
+    def cleanup(self):
+        """Clean up all monitoring components."""
+        self.auto_optimization.cleanup()
+        self.alerting_system.cleanup()
+        self.metrics_collector.cleanup()
+        self.logger.info("PerformanceMonitoringManager cleaned up")

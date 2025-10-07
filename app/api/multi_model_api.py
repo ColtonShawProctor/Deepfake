@@ -9,6 +9,7 @@ progress tracking, and advanced features.
 import asyncio
 import time
 import logging
+from datetime import datetime
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 import uuid
@@ -37,6 +38,7 @@ from ..models.model_selector import ModelSelector
 from ..models.preprocessing_manager import UnifiedPreprocessingManager
 from ..models.adaptive_weighting import AdaptiveWeighting, WeightingStrategy, EnsemblePruningMode, WeightingContext
 from ..models.parallel_processor import ParallelProcessingManager, ProcessingPriority
+from ..models.performance_monitor import PerformanceMonitoringManager, MetricType, AlertLevel
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -116,6 +118,9 @@ class MultiModelAPI:
             max_gpu_memory=8.0,  # 8GB GPU memory limit
             max_workers=8
         )
+        
+        # Initialize performance monitoring manager
+        self.performance_monitor = PerformanceMonitoringManager()
         
         # Task tracking
         self.active_tasks: Dict[str, Dict] = {}
@@ -227,6 +232,19 @@ class MultiModelAPI:
             overall_verdict = "DEEPFAKE" if overall_confidence > 50.0 else "AUTHENTIC"
             
             processing_time = time.time() - start_time
+            
+            # Record performance metrics
+            self.performance_monitor.record_request(
+                processing_time=processing_time,
+                success=True,
+                model_results=model_results,
+                metadata={
+                    "input_analysis": input_analysis.__dict__,
+                    "models_used": list(model_results.keys()),
+                    "optimization_enabled": True,
+                    "phases_active": ["model_selection", "unified_preprocessing", "adaptive_weighting", "parallel_processing"]
+                }
+            )
             
             # Get selection rationale for metadata
             selection_rationale = self.model_selector.get_selection_rationale(input_analysis, models)
@@ -1007,4 +1025,185 @@ async def analyze_image_ultimate_optimization(file: UploadFile = File(...)):
         
     except Exception as e:
         logger.error(f"Ultimate optimization analysis failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+
+@router.get("/monitoring/dashboard")
+async def get_performance_dashboard():
+    """Get real-time performance dashboard data"""
+    try:
+        if not hasattr(api_instance, 'performance_monitor'):
+            raise HTTPException(status_code=503, detail="Performance monitor not available")
+        
+        dashboard_data = api_instance.performance_monitor.get_dashboard_data()
+        
+        return {
+            "dashboard_data": dashboard_data,
+            "timestamp": time.time(),
+            "monitoring_enabled": True
+        }
+        
+    except Exception as e:
+        logger.error(f"Dashboard data failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get dashboard data: {str(e)}")
+
+
+@router.get("/monitoring/metrics/{metric_type}")
+async def get_metric_data(metric_type: str, duration_minutes: int = 60):
+    """Get detailed metric data for a specific metric type"""
+    try:
+        if not hasattr(api_instance, 'performance_monitor'):
+            raise HTTPException(status_code=503, detail="Performance monitor not available")
+        
+        # Validate metric type
+        try:
+            metric_enum = MetricType(metric_type)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid metric type: {metric_type}")
+        
+        # Get metric summary
+        summary = api_instance.performance_monitor.metrics_collector.get_metric_summary(
+            metric_enum, duration_minutes
+        )
+        
+        return {
+            "metric_type": metric_type,
+            "duration_minutes": duration_minutes,
+            "summary": summary,
+            "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        logger.error(f"Metric data failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get metric data: {str(e)}")
+
+
+@router.get("/monitoring/alerts")
+async def get_alerts(active_only: bool = True):
+    """Get performance alerts"""
+    try:
+        if not hasattr(api_instance, 'performance_monitor'):
+            raise HTTPException(status_code=503, detail="Performance monitor not available")
+        
+        if active_only:
+            alerts = api_instance.performance_monitor.alerting_system.get_active_alerts()
+        else:
+            alerts = api_instance.performance_monitor.alerting_system.get_alert_history(24)
+        
+        return {
+            "alerts": [
+                {
+                    "id": alert.alert_id,
+                    "level": alert.level.value,
+                    "metric_type": alert.metric_type.value,
+                    "message": alert.message,
+                    "value": alert.value,
+                    "threshold": alert.threshold,
+                    "timestamp": alert.timestamp,
+                    "resolved": alert.resolved,
+                    "resolved_at": alert.resolved_at
+                }
+                for alert in alerts
+            ],
+            "active_only": active_only,
+            "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        logger.error(f"Alerts data failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get alerts: {str(e)}")
+
+
+@router.post("/monitoring/alerts/{alert_id}/resolve")
+async def resolve_alert(alert_id: str):
+    """Resolve a specific alert"""
+    try:
+        if not hasattr(api_instance, 'performance_monitor'):
+            raise HTTPException(status_code=503, detail="Performance monitor not available")
+        
+        api_instance.performance_monitor.alerting_system.resolve_alert(alert_id)
+        
+        return {
+            "message": f"Alert {alert_id} resolved successfully",
+            "alert_id": alert_id,
+            "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        logger.error(f"Alert resolution failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to resolve alert: {str(e)}")
+
+
+@router.get("/monitoring/export")
+async def export_performance_data(duration_minutes: int = 60):
+    """Export performance data to JSON file"""
+    try:
+        if not hasattr(api_instance, 'performance_monitor'):
+            raise HTTPException(status_code=503, detail="Performance monitor not available")
+        
+        # Create export filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"performance_export_{timestamp}.json"
+        filepath = f"/tmp/{filename}"
+        
+        # Export data
+        api_instance.performance_monitor.export_performance_data(filepath, duration_minutes)
+        
+        return {
+            "message": "Performance data exported successfully",
+            "filename": filename,
+            "filepath": filepath,
+            "duration_minutes": duration_minutes,
+            "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        logger.error(f"Performance export failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to export performance data: {str(e)}")
+
+
+@router.get("/monitoring/optimization/status")
+async def get_optimization_status():
+    """Get auto-optimization status and history"""
+    try:
+        if not hasattr(api_instance, 'performance_monitor'):
+            raise HTTPException(status_code=503, detail="Performance monitor not available")
+        
+        optimization_engine = api_instance.performance_monitor.auto_optimization
+        
+        return {
+            "optimization_enabled": optimization_engine.optimization_enabled,
+            "optimization_interval": optimization_engine.optimization_interval,
+            "last_optimization": optimization_engine.last_optimization,
+            "optimization_history": optimization_engine.get_optimization_history(24),
+            "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        logger.error(f"Optimization status failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get optimization status: {str(e)}")
+
+
+@router.post("/monitoring/optimization/toggle")
+async def toggle_optimization(enabled: bool):
+    """Enable or disable auto-optimization"""
+    try:
+        if not hasattr(api_instance, 'performance_monitor'):
+            raise HTTPException(status_code=503, detail="Performance monitor not available")
+        
+        optimization_engine = api_instance.performance_monitor.auto_optimization
+        
+        if enabled:
+            optimization_engine.enable_optimization()
+        else:
+            optimization_engine.disable_optimization()
+        
+        return {
+            "message": f"Auto-optimization {'enabled' if enabled else 'disabled'}",
+            "optimization_enabled": enabled,
+            "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        logger.error(f"Optimization toggle failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to toggle optimization: {str(e)}") 
