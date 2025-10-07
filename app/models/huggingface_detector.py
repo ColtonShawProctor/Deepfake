@@ -102,9 +102,9 @@ class HuggingFaceDetector(BaseDetector):
                 # Convert to percentage
                 confidence_percentage = confidence_score * 100.0
                 
-                # Determine if it's a deepfake based on the model's output
-                # The model outputs: [real, fake] where index 0 is real, index 1 is fake
-                is_deepfake = predicted_class == 1  # Class 1 is fake/deepfake
+                # FIXED: The model's actual class labels are {0: 'Fake', 1: 'Real'}
+                # So class 0 is fake, class 1 is real
+                is_deepfake = predicted_class == 0  # Class 0 is fake/deepfake
                 
                 # For confidence, use the probability of the predicted class
                 # If real (class 0), use that probability; if fake (class 1), use that probability
@@ -122,10 +122,10 @@ class HuggingFaceDetector(BaseDetector):
                     "model_architecture": "Vision Transformer (ViT)",
                     "confidence_threshold": self.confidence_threshold,
                     "predicted_class": predicted_class,
-                    "class_names": ["real", "fake"],  # Class 0 is real, Class 1 is fake
+                    "class_names": ["fake", "real"],  # Class 0 is fake, Class 1 is real
                     "raw_probabilities": {
-                        "real": probabilities[0, 0].item(),
-                        "fake": probabilities[0, 1].item()
+                        "fake": probabilities[0, 0].item(),
+                        "real": probabilities[0, 1].item()
                     }
                 }
             )
@@ -218,15 +218,32 @@ class HuggingFaceDetectorWrapper:
             
             # FIXED: Use the confidence from the core detector, but add threshold-based confidence adjustment
             # If the model is uncertain (both probabilities are close), reduce confidence
+            # Note: Model labels are {0: 'Fake', 1: 'Real'}, so real_prob is index 1, fake_prob is index 0
             real_prob = probabilities.get("real", 0.0)
             fake_prob = probabilities.get("fake", 0.0)
             max_prob = max(real_prob, fake_prob)
             min_prob = min(real_prob, fake_prob)
             
-            # If probabilities are too close (uncertain), reduce confidence
-            if abs(real_prob - fake_prob) < 0.1:  # Less than 10% difference
-                confidence = max_prob * 0.5  # Reduce confidence for uncertain predictions
-                self.logger.info(f"Uncertain prediction detected, reducing confidence from {max_prob:.3f} to {confidence:.3f}")
+            # Apply confidence calibration to reduce overconfidence in wrong predictions
+            # This addresses the false positive issue where real faces are classified as fake with high confidence
+            
+            # Calculate uncertainty threshold based on the difference between probabilities
+            prob_difference = abs(real_prob - fake_prob)
+            
+            if predicted_class == 1 and real_prob > 0.25:  # Predicted fake but real prob > 25%
+                # This is likely a false positive - reduce confidence significantly
+                confidence = fake_prob * 0.6  # Reduce confidence by 40%
+                self.logger.warning(f"Potential false positive detected - Real prob: {real_prob:.3f}, reducing confidence from {fake_prob:.3f} to {confidence:.3f}")
+            elif predicted_class == 0 and fake_prob > 0.25:  # Predicted real but fake prob > 25%
+                # This is likely a false negative - reduce confidence
+                confidence = real_prob * 0.6  # Reduce confidence by 40%
+                self.logger.warning(f"Potential false negative detected - Fake prob: {fake_prob:.3f}, reducing confidence from {real_prob:.3f} to {confidence:.3f}")
+            elif prob_difference < 0.15:  # Less than 15% difference - very uncertain
+                confidence = max_prob * 0.4  # Reduce confidence by 60% for very uncertain predictions
+                self.logger.info(f"Very uncertain prediction detected (diff: {prob_difference:.3f}), reducing confidence from {max_prob:.3f} to {confidence:.3f}")
+            elif prob_difference < 0.25:  # Less than 25% difference - somewhat uncertain
+                confidence = max_prob * 0.7  # Reduce confidence by 30% for somewhat uncertain predictions
+                self.logger.info(f"Somewhat uncertain prediction detected (diff: {prob_difference:.3f}), reducing confidence from {max_prob:.3f} to {confidence:.3f}")
             else:
                 confidence = result.confidence  # Use the confidence from the core detector
             
