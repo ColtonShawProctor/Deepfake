@@ -600,27 +600,50 @@ class ModelManager:
         # Load ResNet detector
         resnet = ResNetDetector(self.device)
         resnet.load_model(self.models_dir / "resnet_weights.pth")
-        self.ensemble.add_model("ResNet", resnet)
+        if resnet.is_loaded():
+            self.ensemble.add_model("ResNet", resnet)
+            self.logger.info("✓ ResNet loaded and added to ensemble")
+        else:
+            self.logger.error("✗ Failed to load ResNet")
         
         # Load EfficientNet detector
         efficientnet = EfficientNetDetector(self.device)
         efficientnet.load_model(self.models_dir / "efficientnet_weights.pth")
-        self.ensemble.add_model("EfficientNet", efficientnet)
+        if efficientnet.is_loaded():
+            self.ensemble.add_model("EfficientNet", efficientnet)
+            self.logger.info("✓ EfficientNet loaded and added to ensemble")
+        else:
+            self.logger.error("✗ Failed to load EfficientNet")
         
         # Load F3Net detector
         f3net = F3NetDetector(self.device)
         f3net.load_model(self.models_dir / "f3net_weights.pth")
-        self.ensemble.add_model("F3Net", f3net)
+        if f3net.is_loaded():
+            self.ensemble.add_model("F3Net", f3net)
+            self.logger.info("✓ F3Net loaded and added to ensemble")
+        else:
+            self.logger.error("✗ Failed to load F3Net")
         
         # Set optimal attention weights based on research
         # These weights can be fine-tuned based on validation performance
-        attention_weights = [0.4, 0.35, 0.25]  # ResNet, EfficientNet, F3Net
-        self.ensemble.set_attention_weights(attention_weights)
-        
-        # Set confidence calibration temperature
-        self.ensemble.calibrate_confidence(temperature=1.2)
-        
-        self.logger.info("All models loaded successfully")
+        if len(self.ensemble.models) > 0:
+            attention_weights = [0.4, 0.35, 0.25]  # ResNet, EfficientNet, F3Net
+            # Adjust weights based on available models
+            if len(self.ensemble.models) == 3:
+                attention_weights = [0.4, 0.35, 0.25]
+            elif len(self.ensemble.models) == 2:
+                attention_weights = [0.6, 0.4]
+            else:
+                attention_weights = [1.0]
+            
+            self.ensemble.set_attention_weights(attention_weights)
+            
+            # Set confidence calibration temperature
+            self.ensemble.calibrate_confidence(temperature=1.2)
+            
+            self.logger.info(f"All {len(self.ensemble.models)} models loaded successfully")
+        else:
+            self.logger.error("No models were successfully loaded!")
     
     def predict(self, image: Image.Image) -> DetectionResult:
         """Perform ensemble prediction"""

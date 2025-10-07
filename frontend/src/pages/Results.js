@@ -199,15 +199,18 @@ const Results = () => {
   };
 
   const getConfidenceColor = (confidence) => {
-    if (confidence >= 70) return 'danger';
-    if (confidence >= 30) return 'warning';
-    return 'success';
+    // High confidence (regardless of prediction) = green (success)
+    // Medium confidence = yellow (warning) 
+    // Low confidence = red (danger/uncertainty)
+    if (confidence >= 80) return 'success';  // High confidence
+    if (confidence >= 60) return 'warning';  // Medium confidence
+    return 'danger';  // Low confidence (uncertainty)
   };
 
   const getConfidenceText = (confidence) => {
-    if (confidence >= 70) return 'High Risk';
-    if (confidence >= 30) return 'Medium Risk';
-    return 'Low Risk';
+    if (confidence >= 80) return 'High Confidence';
+    if (confidence >= 60) return 'Medium Confidence';
+    return 'Low Confidence';
   };
 
   const getVerdict = (confidence) => {
@@ -893,7 +896,7 @@ const Results = () => {
               {/* Confidence Score */}
               <div className="mb-4">
                 <div className="d-flex justify-content-between align-items-center mb-2">
-                  <span className="fw-bold">{result.isDeepfake ? 'Fake' : 'Real'} Probability</span>
+                  <span className="fw-bold">Model Confidence</span>
                   <span className={`badge bg-${getConfidenceColor(result.confidence)}`}>
                     {result.confidence.toFixed(1)}%
                   </span>
@@ -911,15 +914,17 @@ const Results = () => {
                   </div>
                 </div>
                 <div className="d-flex justify-content-between mt-1">
-                  <small className="text-muted">0%</small>
-                  <small className="text-muted">100%</small>
+                  <small className="text-muted">0% (Uncertain)</small>
+                  <small className="text-muted">100% (Very Confident)</small>
                 </div>
                 <div className="text-center mt-2">
+                  <div className="mb-1">
+                    <strong className={`text-${result.isDeepfake ? 'danger' : 'success'}`}>
+                      Prediction: {result.isDeepfake ? 'FAKE' : 'REAL'}
+                    </strong>
+                  </div>
                   <small className="text-muted">
-                    {result.isDeepfake 
-                      ? `Model is ${result.confidence.toFixed(1)}% confident this is FAKE` 
-                      : `Model is ${result.confidence.toFixed(1)}% confident this is REAL`
-                    }
+                    Model is {result.confidence.toFixed(1)}% confident in this prediction
                   </small>
                 </div>
               </div>

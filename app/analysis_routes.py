@@ -70,26 +70,17 @@ async def analyze_file(
             detail="File not found on disk"
         )
     
-    # Check if analysis already completed - but force fresh analysis for demo purposes
+    # FORCE FRESH ANALYSIS - Always run new analysis to test confidence calibration fixes
+    # This ensures we test the new confidence calibration logic instead of returning cached results
     existing_result = db.query(DetectionResultModel).filter(
         DetectionResultModel.media_file_id == file_id
     ).order_by(desc(DetectionResultModel.analysis_time)).first()
     
-    # For demo purposes, always run fresh analysis to show current model performance
-    # In production, you might want to check if existing_result.model_name != "huggingface_detector"
-    if existing_result and existing_result.model_name == "huggingface_detector":
-        # Return existing result only if it's from the current model
-        # Convert confidence_score from 0-1 scale to 0-100 scale for frontend
-        confidence_percentage = existing_result.confidence_score * 100.0
-        return {
-            "message": "Analysis already completed with current model",
-            "file_id": file_id,
-            "status": "completed",
-            "result_id": existing_result.id,
-            "confidence_score": confidence_percentage,  # Convert to 0-100 scale
-            "is_deepfake": existing_result.is_deepfake,
-            "completed_at": existing_result.analysis_time.isoformat()
-        }
+    # Delete old results to force fresh analysis with new confidence calibration
+    if existing_result:
+        logger.info(f"Deleting old result {existing_result.id} to force fresh analysis with confidence calibration")
+        db.delete(existing_result)
+        db.commit()
     
     try:
         # Run analysis synchronously
@@ -97,6 +88,12 @@ async def analyze_file(
         
         # Run analysis using the new Hugging Face detector
         detection_result = detector.predict(str(file_path))
+        
+        # DEBUG: Log the raw detection result to understand confidence calculation
+        logger.info(f"Raw detection result: {detection_result}")
+        logger.info(f"Confidence: {detection_result.get('confidence', 'N/A')}")
+        logger.info(f"Is deepfake: {detection_result.get('is_deepfake', 'N/A')}")
+        logger.info(f"Probabilities: {detection_result.get('probabilities', 'N/A')}")
         
         # Store result in database
         analysis_time = datetime.utcnow()

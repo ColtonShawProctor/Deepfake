@@ -91,9 +91,14 @@ const VideoTimeline = ({
   };
 
   const getConfidenceColor = (confidence) => {
-    if (confidence > 0.7) return '#38a169'; // Green for high confidence real
-    if (confidence > 0.5) return '#d69e2e'; // Yellow for medium confidence
-    return '#e53e3e'; // Red for low confidence (likely deepfake)
+    // Convert to percentage for consistency
+    const confidencePercent = confidence * 100;
+    // High confidence (regardless of prediction) = green
+    // Medium confidence = yellow 
+    // Low confidence = red (uncertainty)
+    if (confidencePercent >= 80) return '#38a169'; // Green for high confidence
+    if (confidencePercent >= 60) return '#d69e2e'; // Yellow for medium confidence
+    return '#e53e3e'; // Red for low confidence (uncertainty)
   };
 
   return (
@@ -218,7 +223,14 @@ const VideoTimeline = ({
                     ></div>
                   </div>
                   <div className="confidence-text">
-                    Confidence: {(analysis.confidence_score * 100).toFixed(1)}% ({analysis.is_deepfake ? 'FAKE' : 'REAL'})
+                    <div className="mb-1">
+                      <strong className={analysis.is_deepfake ? 'text-danger' : 'text-success'}>
+                        Prediction: {analysis.is_deepfake ? 'FAKE' : 'REAL'}
+                      </strong>
+                    </div>
+                    <div>
+                      Confidence: {(analysis.confidence_score * 100).toFixed(1)}%
+                    </div>
                   </div>
                   <div className={`result-badge ${analysis.is_deepfake ? 'deepfake' : 'real'}`}>
                     {analysis.is_deepfake ? 'Deepfake Detected' : 'Real'}
