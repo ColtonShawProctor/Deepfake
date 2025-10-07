@@ -51,7 +51,12 @@ class BaseDetector(ABC):
         self.device = self._get_device(device)
         self.model = None
         self.transform = None
+        self.is_model_loaded = False
         self.logger = logging.getLogger(f"{__name__}.{model_name}")
+    
+    def is_loaded(self) -> bool:
+        """Check if model is loaded"""
+        return self.is_model_loaded
         
     def _get_device(self, device: str) -> str:
         """Determine the best available device"""
@@ -136,6 +141,7 @@ class ResNetDetector(BaseDetector):
             transforms.Normalize(mean=self.mean, std=self.std)
         ])
         
+        self.is_model_loaded = True
         self.logger.info(f"ResNetDetector loaded on {self.device}")
     
     def preprocess(self, image: Image.Image) -> torch.Tensor:
@@ -262,6 +268,7 @@ class EfficientNetDetector(BaseDetector):
             transforms.Normalize(mean=self.mean, std=self.std)
         ])
         
+        self.is_model_loaded = True
         self.logger.info(f"EfficientNetDetector loaded on {self.device}")
     
     def preprocess(self, image: Image.Image) -> torch.Tensor:
@@ -376,6 +383,7 @@ class F3NetDetector(BaseDetector):
             transforms.Normalize(mean=self.mean, std=self.std)
         ])
         
+        self.is_model_loaded = True
         self.logger.info(f"F3NetDetector loaded on {self.device}")
     
     def preprocess(self, image: Image.Image) -> torch.Tensor:

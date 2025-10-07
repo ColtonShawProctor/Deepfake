@@ -9,10 +9,12 @@ progress tracking, and advanced features.
 import asyncio
 import time
 import logging
+import io
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 import uuid
+from PIL import Image
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks, UploadFile, File
 from fastapi.responses import JSONResponse
@@ -125,10 +127,10 @@ class MultiModelAPI:
         # Task tracking
         self.active_tasks: Dict[str, Dict] = {}
         
+        self.logger = logging.getLogger(f"{__name__}.MultiModelAPI")
+        
         # Initialize models
         self._initialize_models()
-        
-        self.logger = logging.getLogger(f"{__name__}.MultiModelAPI")
     
     def _initialize_models(self):
         """Initialize all available models"""

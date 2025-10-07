@@ -24,6 +24,14 @@ except ImportError:
     ADVANCED_ENSEMBLE_AVAILABLE = False
     print("Warning: Advanced ensemble API not available")
 
+# Import multi-model API routes
+try:
+    from app.api.multi_model_api import router as multi_model_router
+    MULTI_MODEL_AVAILABLE = True
+except ImportError as e:
+    MULTI_MODEL_AVAILABLE = False
+    print(f"Warning: Multi-model API not available: {e}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -66,6 +74,11 @@ if ADVANCED_ENSEMBLE_AVAILABLE:
     app.include_router(advanced_ensemble_router)
     print("✓ Advanced ensemble API routes included")
 
+# Include multi-model API routes if available
+if MULTI_MODEL_AVAILABLE:
+    app.include_router(multi_model_router, prefix="/api/multi-model")
+    print("✓ Multi-model API routes included")
+
 @app.get("/")
 async def root():
     return {
@@ -74,7 +87,7 @@ async def root():
         "features": {
             "basic_detection": True,
             "advanced_ensemble": ADVANCED_ENSEMBLE_AVAILABLE,
-            "multi_model": True,
+            "multi_model": MULTI_MODEL_AVAILABLE,
             "analysis": True,
             "video_analysis": True
         }

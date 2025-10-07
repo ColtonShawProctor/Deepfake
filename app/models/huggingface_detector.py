@@ -213,10 +213,22 @@ class HuggingFaceDetectorWrapper:
             probabilities = result.metadata.get("raw_probabilities", {})
             predicted_class = result.metadata.get("predicted_class", 0)
             
-            # The confidence should be the probability of the predicted class
-            # This ensures that high confidence in "real" shows as high confidence, not low
-            # Class 0 is real, Class 1 is fake
-            confidence = probabilities.get("real" if predicted_class == 0 else "fake", 0.0)
+            # DEBUG: Add logging to understand what's happening
+            self.logger.info(f"Prediction debug - Class: {predicted_class}, Real prob: {probabilities.get('real', 0.0):.3f}, Fake prob: {probabilities.get('fake', 0.0):.3f}")
+            
+            # FIXED: Use the confidence from the core detector, but add threshold-based confidence adjustment
+            # If the model is uncertain (both probabilities are close), reduce confidence
+            real_prob = probabilities.get("real", 0.0)
+            fake_prob = probabilities.get("fake", 0.0)
+            max_prob = max(real_prob, fake_prob)
+            min_prob = min(real_prob, fake_prob)
+            
+            # If probabilities are too close (uncertain), reduce confidence
+            if abs(real_prob - fake_prob) < 0.1:  # Less than 10% difference
+                confidence = max_prob * 0.5  # Reduce confidence for uncertain predictions
+                self.logger.info(f"Uncertain prediction detected, reducing confidence from {max_prob:.3f} to {confidence:.3f}")
+            else:
+                confidence = result.confidence  # Use the confidence from the core detector
             
             # Convert to expected format
             return {

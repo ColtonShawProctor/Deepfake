@@ -104,6 +104,16 @@ class AugmentationConfig:
     contrast_range: float = 0.1
 
 @dataclass
+class MonitoringConfig:
+    """Configuration for performance monitoring"""
+    enable_monitoring: bool = True
+    log_level: str = "INFO"
+    metrics_retention_days: int = 30
+    alert_thresholds: Dict[str, float] = field(default_factory=dict)
+    save_performance_data: bool = True
+    performance_data_path: str = "performance_data"
+
+@dataclass
 class MesoNetConfig:
     """Configuration for MesoNet detector"""
     input_size: Tuple[int, int] = (256, 256)
@@ -113,6 +123,7 @@ class MesoNetConfig:
     enable_calibration: bool = True
     enable_monitoring: bool = True
     augmentation_config: AugmentationConfig = field(default_factory=AugmentationConfig)
+    monitoring_config: MonitoringConfig = field(default_factory=MonitoringConfig)
 
 @dataclass
 class EnsembleConfig:
