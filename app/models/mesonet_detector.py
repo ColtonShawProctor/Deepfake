@@ -327,13 +327,19 @@ class MesoNetDetector(BaseDetector):
             # Generate metadata
             metadata = self._generate_metadata(image, processing_time)
             
+            # Generate heatmap if enabled
+            heatmap = None
+            if self.config.enable_heatmap:
+                heatmap = self._generate_heatmap(input_tensor)
+            
             return DetectionResult(
                 confidence_score=confidence_score,
                 is_deepfake=is_deepfake,
                 model_name=self.model_name,
                 processing_time=processing_time,
                 model_version=self.model_version,
-                metadata=metadata
+                metadata=metadata,
+                heatmap=heatmap
             )
             
         except Exception as e:
@@ -348,6 +354,57 @@ class MesoNetDetector(BaseDetector):
                 model_version=self.model_version,
                 metadata={"error": str(e)}
             )
+    
+    def _generate_heatmap(self, input_tensor: torch.Tensor) -> Optional[np.ndarray]:
+        """Generate heatmap for the input tensor using Grad-CAM"""
+        try:
+            # Enable gradients
+            input_tensor.requires_grad_(True)
+            
+            # Forward pass
+            outputs = self.model(input_tensor)
+            probabilities = F.softmax(outputs, dim=1)
+            
+            # Get the target class (deepfake = 1)
+            target_class = 1
+            target_score = probabilities[0, target_class]
+            
+            # Backward pass
+            target_score.backward()
+            
+            # Get gradients
+            gradients = input_tensor.grad.data
+            
+            # Generate heatmap
+            pooled_gradients = torch.mean(gradients, dim=[0, 2, 3])
+            
+            # Get the last convolutional layer output
+            # For MesoNet, we'll use the last conv layer
+            conv_output = None
+            for module in self.model.modules():
+                if isinstance(module, torch.nn.Conv2d):
+                    conv_output = module(input_tensor)
+            
+            if conv_output is not None:
+                # Weight the channels by gradients
+                for i, weight in enumerate(pooled_gradients):
+                    conv_output[0, i, :, :] *= weight
+                
+                # Generate heatmap
+                heatmap = torch.mean(conv_output, dim=1).squeeze()
+                heatmap = F.relu(heatmap)
+                
+                # Normalize
+                heatmap = heatmap.detach().cpu().numpy()
+                if heatmap.max() > 0:
+                    heatmap = heatmap / heatmap.max()
+                
+                return heatmap
+            
+        except Exception as e:
+            self.logger.warning(f"Heatmap generation failed: {str(e)}")
+            
+        return None
     
     def generate_heatmap(self, image: Image.Image) -> np.ndarray:
         """Generate Grad-CAM heatmap for explainability"""

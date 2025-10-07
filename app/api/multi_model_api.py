@@ -138,16 +138,20 @@ class MultiModelAPI:
             # Register MesoNet
             mesonet_config = MesoNetConfig()
             mesonet = MesoNetDetector(mesonet_config)
+            mesonet.load_model("models/mesonet_weights.pth")
             self.registry.register_model("MesoNet", mesonet, {"type": "enhanced"})
             
-            # Register existing models
+            # Register existing models with correct model paths
             resnet = ResNetDetector()
+            resnet.load_model("models/resnet_weights.pth")
             self.registry.register_model("ResNet", resnet, {"type": "resnet"})
             
             efficientnet = EfficientNetDetector()
+            efficientnet.load_model("models/efficientnet_weights.pth")
             self.registry.register_model("EfficientNet", efficientnet, {"type": "efficientnet"})
             
             f3net = F3NetDetector()
+            f3net.load_model("models/f3net_weights.pth")
             self.registry.register_model("F3Net", f3net, {"type": "f3net"})
             
             # Add models to ensemble
@@ -489,8 +493,9 @@ async def analyze_image_multi_model(
                 "confidence_score": detection_result.confidence_score,
                 "is_deepfake": detection_result.is_deepfake,
                 "processing_time": detection_result.processing_time,
-                "model_version": detection_result.model_version,
-                "metadata": detection_result.metadata
+                "model_name": detection_result.model_name,
+                "metadata": detection_result.metadata,
+                "heatmap_data": detection_result.heatmap_data.__dict__ if detection_result.heatmap_data else None
             }
         
         ensemble_result_dict = None

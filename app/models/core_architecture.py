@@ -39,6 +39,7 @@ class DetectionResult:
     model_version: str
     metadata: Dict[str, Any]
     heatmap: Optional[np.ndarray] = None
+    heatmap_data: Optional[Any] = None  # For compatibility with deepfake_models
     uncertainty: Optional[float] = None
     attention_weights: Optional[List[float]] = None
 
@@ -122,6 +123,7 @@ class MesoNetConfig:
     enable_cache: bool = True
     enable_calibration: bool = True
     enable_monitoring: bool = True
+    enable_heatmap: bool = True
     augmentation_config: AugmentationConfig = field(default_factory=AugmentationConfig)
     monitoring_config: MonitoringConfig = field(default_factory=MonitoringConfig)
 

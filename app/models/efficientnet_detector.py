@@ -220,7 +220,7 @@ class EfficientNetDetector(BaseDetector):
             device: Device to run inference on
             config: Configuration dictionary
         """
-        super().__init__(model_name, device, config)
+        super().__init__(model_name, device)
         
         # EfficientNet-specific configuration
         self.config = config or {}
@@ -411,9 +411,25 @@ class EfficientNetDetector(BaseDetector):
             is_deepfake = confidence < self.confidence_threshold
             
             # Generate attention map if enabled
-            attention_maps = None
+            attention_map = None
+            heatmap_data = None
             if self.enable_attention:
-                attention_maps = self._generate_attention_map(tensor)
+                self.logger.info("Generating attention map...")
+                attention_map = self._generate_attention_map(tensor)
+                self.logger.info(f"Attention map generated: {attention_map is not None}")
+                if attention_map is not None:
+                    self.logger.info(f"Attention map shape: {attention_map.shape}")
+                    # Convert to list format for JSON serialization
+                    attention_list = attention_map.tolist()
+                    heatmap_data = HeatmapData(
+                        attention_map=attention_list,
+                        map_type="attention",
+                        model_name=self.model_name,
+                        dimensions={"width": attention_map.shape[1], "height": attention_map.shape[0]}
+                    )
+                    self.logger.info("Heatmap data created successfully")
+                else:
+                    self.logger.warning("Attention map generation returned None")
             
             # Calculate inference time
             inference_time = time.time() - start_time
@@ -423,10 +439,10 @@ class EfficientNetDetector(BaseDetector):
             
             # Create result
             result = DetectionResult(
+                confidence_score=confidence,
                 is_deepfake=is_deepfake,
-                confidence=confidence,
                 model_name=self.model_name,
-                inference_time=inference_time,
+                processing_time=inference_time,
                 metadata={
                     "architecture": "EfficientNet-B4",
                     "input_size": self.model_info.input_size,
@@ -438,8 +454,7 @@ class EfficientNetDetector(BaseDetector):
                     "f1_score": self.f1_score,
                     "mobile_optimized": self.mobile_optimized
                 },
-                attention_maps=attention_maps,
-                preprocessing_info=self.preprocessor.get_preprocessing_info()
+                heatmap_data=heatmap_data
             )
             
             self.logger.info(f"EfficientNet-B4 prediction: {is_deepfake} (confidence: {confidence:.3f})")
@@ -451,7 +466,7 @@ class EfficientNetDetector(BaseDetector):
     
     def _generate_attention_map(self, tensor: torch.Tensor) -> Optional[np.ndarray]:
         """
-        Generate attention map for the input tensor.
+        Generate attention map for the input tensor using Grad-CAM.
         
         Args:
             tensor: Preprocessed input tensor
@@ -466,21 +481,46 @@ class EfficientNetDetector(BaseDetector):
             # Forward pass
             output = self.model(tensor)
             
+            # Get the target class (deepfake = 0 for this model)
+            target_class = 0
+            target_score = output[0, target_class]
+            
             # Backward pass
-            output.backward()
+            target_score.backward()
             
-            # Generate attention map
-            attention_map = self.model.get_attention_map()
+            # Get gradients
+            gradients = tensor.grad.data
             
-            # Resize attention map to original image size
-            if attention_map is not None:
-                attention_map = self._resize_attention_map(attention_map, tensor.shape[2:])
+            # Generate attention map using Grad-CAM
+            pooled_gradients = torch.mean(gradients, dim=[0, 2, 3])
             
-            return attention_map
+            # Get the last convolutional layer output
+            # For EfficientNet, we need to find the last conv layer
+            conv_output = None
+            for module in self.model.modules():
+                if isinstance(module, torch.nn.Conv2d):
+                    conv_output = module(tensor)
+            
+            if conv_output is not None:
+                # Weight the channels by gradients
+                for i, weight in enumerate(pooled_gradients):
+                    conv_output[0, i, :, :] *= weight
+                
+                # Generate attention map
+                attention_map = torch.mean(conv_output, dim=1).squeeze()
+                attention_map = F.relu(attention_map)
+                
+                # Normalize
+                attention_map = attention_map.detach().cpu().numpy()
+                if attention_map.max() > 0:
+                    attention_map = attention_map / attention_map.max()
+                
+                return attention_map
             
         except Exception as e:
             self.logger.warning(f"Attention map generation failed: {str(e)}")
-            return None
+            
+        return None
     
     def _resize_attention_map(self, attention_map: np.ndarray, target_size: Tuple[int, int]) -> np.ndarray:
         """

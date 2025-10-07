@@ -128,7 +128,7 @@ async def analyze_file(
             "file_id": file_id,
             "filename": media_file.filename,
             "detection_result": {
-                "confidence_score": detection_result["confidence"] * 100.0,  # Convert to 0-100 scale
+                "confidence_score": detection_result["confidence"],  # Already in 0-100 scale
                 "is_deepfake": detection_result["is_deepfake"],
                 "analysis_metadata": {
                     "model": detection_result.get("model", "huggingface_detector"),
@@ -193,7 +193,7 @@ async def get_analysis_results(
         metadata = {}
     
     api_detection_result = {
-        "confidence_score": detection_result.confidence_score * 100.0,
+        "confidence_score": detection_result.confidence_score,  # Already in 0-100 scale
         "is_deepfake": detection_result.is_deepfake,
         "analysis_metadata": metadata,
         "analysis_time": detection_result.analysis_time.isoformat(),
@@ -255,7 +255,7 @@ async def get_analysis_history(
                 metadata = {}
             
             api_detection_result = {
-                "confidence_score": result.confidence_score * 100.0,  # Convert from 0-1 to 0-100 scale
+                "confidence_score": result.confidence_score,  # Already in 0-100 scale
                 "is_deepfake": result.is_deepfake,
                 "analysis_metadata": metadata,
                 "analysis_time": result.analysis_time.isoformat(),

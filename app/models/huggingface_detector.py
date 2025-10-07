@@ -230,11 +230,11 @@ class HuggingFaceDetectorWrapper:
             # Calculate uncertainty threshold based on the difference between probabilities
             prob_difference = abs(real_prob - fake_prob)
             
-            if predicted_class == 1 and real_prob > 0.25:  # Predicted fake but real prob > 25%
+            if predicted_class == 0 and real_prob > 0.25:  # Predicted fake but real prob > 25%
                 # This is likely a false positive - reduce confidence significantly
                 confidence = fake_prob * 0.6  # Reduce confidence by 40%
                 self.logger.warning(f"Potential false positive detected - Real prob: {real_prob:.3f}, reducing confidence from {fake_prob:.3f} to {confidence:.3f}")
-            elif predicted_class == 0 and fake_prob > 0.25:  # Predicted real but fake prob > 25%
+            elif predicted_class == 1 and fake_prob > 0.25:  # Predicted real but fake prob > 25%
                 # This is likely a false negative - reduce confidence
                 confidence = real_prob * 0.6  # Reduce confidence by 40%
                 self.logger.warning(f"Potential false negative detected - Fake prob: {fake_prob:.3f}, reducing confidence from {real_prob:.3f} to {confidence:.3f}")

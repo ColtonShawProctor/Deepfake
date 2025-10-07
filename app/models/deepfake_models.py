@@ -33,6 +33,16 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 @dataclass
+class HeatmapData:
+    """Heatmap visualization data"""
+    attention_map: Optional[List[List[float]]] = None
+    frequency_map: Optional[List[List[float]]] = None
+    spatial_map: Optional[List[List[float]]] = None
+    map_type: str = "attention"  # 'attention', 'frequency', 'spatial', 'ensemble'
+    model_name: str = ""
+    dimensions: Optional[Dict[str, int]] = None  # width, height
+
+@dataclass
 class DetectionResult:
     """Standardized detection result format"""
     confidence_score: float
@@ -42,6 +52,7 @@ class DetectionResult:
     uncertainty: Optional[float] = None
     attention_weights: Optional[List[float]] = None
     metadata: Optional[Dict[str, Any]] = None
+    heatmap_data: Optional[HeatmapData] = None
 
 class BaseDetector(ABC):
     """Abstract base class for all deepfake detectors"""
@@ -215,6 +226,7 @@ class EfficientNetDetector(BaseDetector):
         self.input_size = (224, 224)
         self.mean = [0.485, 0.456, 0.406]
         self.std = [0.229, 0.224, 0.225]
+        self.enable_attention = True
         
     def load_model(self, weights_path: Optional[str] = None) -> None:
         """Load EfficientNet-B4 model with deepfake detection head"""
@@ -306,11 +318,24 @@ class EfficientNetDetector(BaseDetector):
             
             processing_time = time.time() - start_time
             
+            # Generate heatmap if enabled
+            heatmap_data = None
+            if self.enable_attention:
+                heatmap = self._generate_heatmap(input_tensor)
+                if heatmap is not None:
+                    heatmap_data = HeatmapData(
+                        attention_map=heatmap.tolist(),
+                        map_type="attention",
+                        model_name=self.model_name,
+                        dimensions={"width": heatmap.shape[1], "height": heatmap.shape[0]}
+                    )
+            
             return DetectionResult(
                 confidence_score=confidence_score,
                 is_deepfake=confidence_score > 50.0,
                 model_name=self.model_name,
                 processing_time=processing_time,
+                heatmap_data=heatmap_data,
                 metadata={
                     "input_size": self.input_size,
                     "model_architecture": "EfficientNet-B4",
@@ -327,6 +352,42 @@ class EfficientNetDetector(BaseDetector):
                 processing_time=time.time() - start_time,
                 metadata={"error": str(e)}
             )
+    
+    def _generate_heatmap(self, input_tensor: torch.Tensor) -> Optional[np.ndarray]:
+        """Generate heatmap for the input tensor using simple gradient-based attention"""
+        try:
+            # Enable gradients
+            input_tensor.requires_grad_(True)
+            
+            # Forward pass
+            output = self.model(input_tensor)
+            
+            # Get the target class (deepfake = 0 for this model)
+            target_class = 0
+            target_score = output[0, target_class]
+            
+            # Backward pass
+            target_score.backward()
+            
+            # Get gradients
+            gradients = input_tensor.grad.data
+            
+            # Generate simple attention map from input gradients
+            # Average across channels and normalize
+            attention_map = torch.mean(torch.abs(gradients), dim=1).squeeze()
+            attention_map = F.relu(attention_map)
+            
+            # Normalize
+            attention_map = attention_map.detach().cpu().numpy()
+            if attention_map.max() > 0:
+                attention_map = attention_map / attention_map.max()
+            
+            return attention_map
+            
+        except Exception as e:
+            self.logger.warning(f"Heatmap generation failed: {str(e)}")
+            
+        return None
 
 class F3NetDetector(BaseDetector):
     """

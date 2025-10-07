@@ -339,9 +339,19 @@ class XceptionDetector(BaseDetector):
             is_deepfake = confidence > self.confidence_threshold
             
             # Generate Grad-CAM heatmap if enabled
-            attention_maps = None
+            gradcam_map = None
+            heatmap_data = None
             if self.enable_gradcam:
-                attention_maps = self._generate_gradcam(tensor)
+                gradcam_map = self._generate_gradcam(tensor)
+                if gradcam_map is not None:
+                    # Convert to list format for JSON serialization
+                    gradcam_list = gradcam_map.tolist()
+                    heatmap_data = HeatmapData(
+                        spatial_map=gradcam_list,
+                        map_type="spatial",
+                        model_name=self.model_name,
+                        dimensions={"width": gradcam_map.shape[1], "height": gradcam_map.shape[0]}
+                    )
             
             # Calculate inference time
             inference_time = time.time() - start_time
@@ -351,10 +361,10 @@ class XceptionDetector(BaseDetector):
             
             # Create result
             result = DetectionResult(
+                confidence_score=confidence,
                 is_deepfake=is_deepfake,
-                confidence=confidence,
                 model_name=self.model_name,
-                inference_time=inference_time,
+                processing_time=inference_time,
                 metadata={
                     "architecture": "Xception",
                     "input_size": self.model_info.input_size,
@@ -364,8 +374,7 @@ class XceptionDetector(BaseDetector):
                     "recall": self.recall,
                     "f1_score": self.f1_score
                 },
-                attention_maps=attention_maps,
-                preprocessing_info=self.preprocessor.get_preprocessing_info()
+                heatmap_data=heatmap_data
             )
             
             self.logger.info(f"Xception prediction: {is_deepfake} (confidence: {confidence:.3f})")

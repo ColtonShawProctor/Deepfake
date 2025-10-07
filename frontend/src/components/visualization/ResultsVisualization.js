@@ -39,7 +39,7 @@ const ResultsVisualization = forwardRef(({
   const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
   const [activeModel, setActiveModel] = useState('ensemble');
   const [showOverlays, setShowOverlays] = useState(true);
-  const [overlayOpacity, setOverlayOpacity] = useState(0.7);
+  const [overlayOpacity, setOverlayOpacity] = useState(0.9);
   const [viewMode, setViewMode] = useState(mode);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hoveredRegion, setHoveredRegion] = useState(null);
@@ -185,9 +185,31 @@ const ResultsVisualization = forwardRef(({
 
   const getHeatmapData = (modelName) => {
     if (modelName === 'ensemble') {
-      return ensembleResult.attentionMaps;
+      // For ensemble, combine all available heatmaps
+      const heatmaps = [];
+      Object.values(individualResults).forEach(result => {
+        if (result.heatmap_data) {
+          const mapData = result.heatmap_data.attention_map || 
+                         result.heatmap_data.spatial_map || 
+                         result.heatmap_data.frequency_map;
+          if (mapData) {
+            heatmaps.push(mapData);
+          }
+        }
+      });
+      
+      // Return the first available heatmap or combine them
+      return heatmaps.length > 0 ? heatmaps[0] : null;
     }
-    return individualResults[modelName]?.attentionMaps;
+    
+    const result = individualResults[modelName];
+    if (result?.heatmap_data) {
+      return result.heatmap_data.attention_map || 
+             result.heatmap_data.spatial_map || 
+             result.heatmap_data.frequency_map;
+    }
+    
+    return null;
   };
 
   const getHeatmapIntensity = (x, y, heatmapData) => {
@@ -280,7 +302,7 @@ const ResultsVisualization = forwardRef(({
               <HeatmapOverlay
                 data={getHeatmapData(activeModel)}
                 opacity={overlayOpacity}
-                colorMap="plasma"
+                colorMap="fire"
                 onRegionClick={focusOnImageRegion}
               />
             )}
@@ -302,7 +324,7 @@ const ResultsVisualization = forwardRef(({
                   {model.name}
                   {model.confidence !== null && (
                     <span className="ml-1 text-xs opacity-75">
-                      {(model.confidence * 100).toFixed(1)}%
+                      {model.confidence.toFixed(1)}%
                     </span>
                   )}
                 </button>
@@ -412,7 +434,7 @@ const ResultsVisualization = forwardRef(({
             <HeatmapOverlay
               data={getHeatmapData(activeModel)}
               opacity={overlayOpacity}
-              colorMap="plasma"
+              colorMap="fire"
               onRegionClick={focusOnImageRegion}
               interactive={true}
             />
@@ -462,14 +484,14 @@ const ResultsVisualization = forwardRef(({
             >
               <HeatmapOverlay
                 data={getHeatmapData(model.id)}
-                opacity={0.6}
-                colorMap="plasma"
+                opacity={0.8}
+                colorMap="fire"
               />
             </InteractiveImageViewer>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-slate-900">
-              {(model.confidence * 100).toFixed(1)}%
+              {model.confidence.toFixed(1)}%
             </div>
             <div className="text-sm text-slate-600">Confidence ({ensembleResult.isDeepfake ? 'FAKE' : 'REAL'})</div>
           </div>
@@ -549,7 +571,7 @@ const ResultsVisualization = forwardRef(({
           >
             <div className="text-sm">
               <div>Position: ({hoveredRegion.x}, {hoveredRegion.y})</div>
-              <div>Confidence: {(hoveredRegion.confidence * 100).toFixed(1)}% ({ensembleResult.isDeepfake ? 'FAKE' : 'REAL'})</div>
+              <div>Confidence: {hoveredRegion.confidence.toFixed(1)}% ({ensembleResult.isDeepfake ? 'FAKE' : 'REAL'})</div>
             </div>
           </motion.div>
         )}

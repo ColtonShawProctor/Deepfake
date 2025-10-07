@@ -635,9 +635,19 @@ class F3NetDetector(BaseDetector):
             is_deepfake = confidence > self.confidence_threshold
             
             # Generate frequency heatmap if enabled
-            frequency_maps = None
+            frequency_map = None
+            heatmap_data = None
             if self.enable_frequency_visualization:
-                frequency_maps = self._generate_frequency_heatmap(tensor)
+                frequency_map = self._generate_frequency_heatmap(tensor)
+                if frequency_map is not None:
+                    # Convert to list format for JSON serialization
+                    frequency_list = frequency_map.tolist()
+                    heatmap_data = HeatmapData(
+                        frequency_map=frequency_list,
+                        map_type="frequency",
+                        model_name=self.model_name,
+                        dimensions={"width": frequency_map.shape[1], "height": frequency_map.shape[0]}
+                    )
             
             # Calculate inference time
             inference_time = time.time() - start_time
@@ -647,10 +657,10 @@ class F3NetDetector(BaseDetector):
             
             # Create result
             result = DetectionResult(
+                confidence_score=confidence,
                 is_deepfake=is_deepfake,
-                confidence=confidence,
                 model_name=self.model_name,
-                inference_time=inference_time,
+                processing_time=inference_time,
                 metadata={
                     "architecture": "F3Net",
                     "input_size": self.model_info.input_size,
@@ -662,8 +672,7 @@ class F3NetDetector(BaseDetector):
                     "f1_score": self.f1_score,
                     "dct_block_size": self.dct_block_size
                 },
-                attention_maps=frequency_maps,
-                preprocessing_info=self.preprocessor.get_preprocessing_info()
+                heatmap_data=heatmap_data
             )
             
             self.logger.info(f"F3Net prediction: {is_deepfake} (confidence: {confidence:.3f})")

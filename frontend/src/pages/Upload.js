@@ -130,8 +130,18 @@ const Upload = () => {
       setUploading(false);
       setAnalyzing(true);
 
-      // Start analysis using the uploaded file ID instead of uploading again
-      const analysisResponse = await analysisAPI.analyzeFile(uploadResponse.file_id);
+      // Use multi-model API for more accurate analysis
+      const multiModelResponse = await analysisAPI.analyzeFileMultiModel(selectedFile, {
+        use_ensemble: true,
+        generate_heatmaps: true
+      });
+      
+      // Transform multi-model response to match existing UI expectations
+      const analysisResponse = analysisAPI.transformMultiModelResponse(multiModelResponse);
+      
+      // Set file info in the response
+      analysisResponse.file_id = uploadResponse.file_id;
+      analysisResponse.filename = selectedFile.name;
       
       // Check if analysis is complete
       if (analysisResponse && analysisResponse.detection_result && analysisResponse.detection_result.is_deepfake !== undefined) {

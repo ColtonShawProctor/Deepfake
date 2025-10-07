@@ -89,6 +89,15 @@ class AnalysisMetadata(BaseModel):
     analysis_parameters: Optional[AnalysisParameters] = None
     result_summary: Optional[ResultSummary] = None
 
+class HeatmapData(BaseModel):
+    """Schema for heatmap visualization data"""
+    attention_map: Optional[List[List[float]]] = None
+    frequency_map: Optional[List[List[float]]] = None
+    spatial_map: Optional[List[List[float]]] = None
+    map_type: str  # 'attention', 'frequency', 'spatial', 'ensemble'
+    model_name: str
+    dimensions: Optional[Dict[str, int]] = None  # width, height
+
 class DetectionResult(BaseModel):
     """Schema for deepfake detection result"""
     confidence_score: float
@@ -97,6 +106,7 @@ class DetectionResult(BaseModel):
     analysis_time: str
     processing_time_seconds: float
     error: Optional[str] = None
+    heatmap_data: Optional[HeatmapData] = None
 
 class DetectionResponse(BaseModel):
     """Schema for detection API response"""

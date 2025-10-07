@@ -291,6 +291,70 @@ export const analysisAPI = {
     }
   },
 
+  // Analyze file using Multi-Model API (more accurate)
+  analyzeFileMultiModel: async (file, options = {}) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Add optional parameters
+      if (options.models) {
+        formData.append('models', options.models);
+      }
+      if (options.use_ensemble !== undefined) {
+        formData.append('use_ensemble', options.use_ensemble);
+      }
+      if (options.generate_heatmaps !== undefined) {
+        formData.append('generate_heatmaps', options.generate_heatmaps);
+      }
+
+      const response = await api.post('/api/multi-model/api/v2/analyze/multi-model', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Transform multi-model response to match existing UI expectations
+  transformMultiModelResponse: (multiModelResponse) => {
+    // Extract ensemble result as primary result
+    const ensembleResult = multiModelResponse.ensemble_result;
+    const overallConfidence = multiModelResponse.overall_confidence;
+    const overallVerdict = multiModelResponse.overall_verdict;
+    
+    // Create a detection result that matches the expected format
+    const detectionResult = {
+      confidence_score: overallConfidence, // Already in 0-100 scale
+      is_deepfake: overallVerdict?.toLowerCase() === 'deepfake',
+      analysis_metadata: {
+        method: 'multi-model-ensemble',
+        models_used: Object.keys(multiModelResponse.model_results),
+        ensemble_method: ensembleResult?.ensemble_method || 'weighted_average',
+        individual_results: multiModelResponse.model_results,
+        processing_time: multiModelResponse.processing_time
+      },
+      analysis_time: new Date().toISOString(),
+      processing_time_seconds: multiModelResponse.processing_time,
+      error: null
+    };
+
+    return {
+      success: true,
+      message: "Multi-model analysis completed successfully",
+      file_id: null, // Will be set by caller
+      filename: null, // Will be set by caller
+      detection_result: detectionResult,
+      created_at: new Date().toISOString(),
+      // Include full multi-model response for detailed view
+      multi_model_response: multiModelResponse
+    };
+  },
+
   // Get analysis status
   getAnalysisStatus: async (analysisId) => {
     try {

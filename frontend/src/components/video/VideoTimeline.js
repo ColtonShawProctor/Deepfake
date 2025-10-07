@@ -91,13 +91,12 @@ const VideoTimeline = ({
   };
 
   const getConfidenceColor = (confidence) => {
-    // Convert to percentage for consistency
-    const confidencePercent = confidence * 100;
+    // Confidence is already in 0-100 scale
     // High confidence (regardless of prediction) = green
     // Medium confidence = yellow 
     // Low confidence = red (uncertainty)
-    if (confidencePercent >= 80) return '#38a169'; // Green for high confidence
-    if (confidencePercent >= 60) return '#d69e2e'; // Yellow for medium confidence
+    if (confidence >= 80) return '#38a169'; // Green for high confidence
+    if (confidence >= 60) return '#d69e2e'; // Yellow for medium confidence
     return '#e53e3e'; // Red for low confidence (uncertainty)
   };
 
@@ -170,7 +169,7 @@ const VideoTimeline = ({
                   left: `${position}%`,
                   backgroundColor: getConfidenceColor(confidence)
                 }}
-                title={`Frame ${frameAnalysis.frame_number}: ${(confidence * 100).toFixed(1)}% confidence (${frameAnalysis.is_deepfake ? 'FAKE' : 'REAL'})`}
+                title={`Frame ${frameAnalysis.frame_number}: ${confidence.toFixed(1)}% confidence (${frameAnalysis.is_deepfake ? 'FAKE' : 'REAL'})`}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (onFrameSelect) {
@@ -184,7 +183,7 @@ const VideoTimeline = ({
                 <div className="frame-tooltip">
                   <div>Frame {frameAnalysis.frame_number}</div>
                   <div>Time: {formatTime(frameTime)}</div>
-                  <div>Confidence: {(confidence * 100).toFixed(1)}% ({frameAnalysis.is_deepfake ? 'FAKE' : 'REAL'})</div>
+                  <div>Confidence: {confidence.toFixed(1)}% ({frameAnalysis.is_deepfake ? 'FAKE' : 'REAL'})</div>
                   <div>Result: {frameAnalysis.is_deepfake ? 'Deepfake' : 'Real'}</div>
                 </div>
               </div>
@@ -217,7 +216,7 @@ const VideoTimeline = ({
                     <div 
                       className="confidence-fill"
                       style={{ 
-                        width: `${analysis.confidence_score * 100}%`,
+                        width: `${analysis.confidence_score}%`,
                         backgroundColor: getConfidenceColor(analysis.confidence_score)
                       }}
                     ></div>
@@ -229,7 +228,7 @@ const VideoTimeline = ({
                       </strong>
                     </div>
                     <div>
-                      Confidence: {(analysis.confidence_score * 100).toFixed(1)}%
+                      Confidence: {analysis.confidence_score.toFixed(1)}%
                     </div>
                   </div>
                   <div className={`result-badge ${analysis.is_deepfake ? 'deepfake' : 'real'}`}>

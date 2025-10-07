@@ -57,7 +57,7 @@ async def analyze_file(
         )
     
     try:
-        # Perform deepfake detection with single EfficientNet model
+        # Perform deepfake detection with HuggingFace model
         detection_result = detector.predict(str(file_path))
         
         # Store result in database
@@ -68,7 +68,7 @@ async def analyze_file(
             media_file_id=media_file.id,
             confidence_score=detection_result["confidence"],  # Already 0-1 scale
             is_deepfake=detection_result["is_deepfake"],
-            model_name=detection_result.get("model", "efficientnet"),  # Single model name
+            model_name=detection_result.get("model", "huggingface"),  # Model name
             processing_time=detection_result.get("inference_time", 0.0),  # Inference time
             uncertainty=None,  # Single model doesn't have ensemble uncertainty
             attention_weights=None,  # Single model doesn't have ensemble weights
@@ -87,7 +87,6 @@ async def analyze_file(
         
         # Create proper DetectionResult object from detector response
         from app.schemas import DetectionResult
-        from datetime import datetime
         
         detection_result_obj = DetectionResult(
             confidence_score=detection_result["confidence"],
@@ -158,7 +157,7 @@ async def get_detection_result(
     from app.schemas import DetectionResult
     
     api_detection_result = DetectionResult(
-        confidence_score=detection_result.confidence_score * 100.0,  # Convert from 0-1 to 0-100 scale
+        confidence_score=detection_result.confidence_score,  # Already in 0-100 scale
         is_deepfake=detection_result.is_deepfake,
         analysis_metadata=metadata,
         analysis_time=detection_result.analysis_time.isoformat(),
@@ -213,7 +212,7 @@ async def get_user_detection_results(
                     
                     # Create proper DetectionResult object
                     api_detection_result = DetectionResult(
-                        confidence_score=result.confidence_score * 100.0,  # Convert from 0-1 to 0-100 scale
+                        confidence_score=result.confidence_score,  # Already in 0-100 scale
                         is_deepfake=result.is_deepfake,
                         analysis_metadata=metadata,
                         analysis_time=result.analysis_time.isoformat(),

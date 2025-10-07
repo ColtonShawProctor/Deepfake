@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { analysisAPI } from '../services/api';
 import { useApiError } from '../hooks/useApiError';
 
 const Results = () => {
   const { fileId } = useParams();
+  const location = useLocation();
   const { error, handleError, clearError } = useApiError();
   
   const [result, setResult] = useState(null);
@@ -33,7 +34,35 @@ const Results = () => {
     currentFileIdRef.current = fileId;
     
     try {
-      // Simple single request with timeout
+      // Check if we have analysis result from navigation state (multi-model API)
+      if (location.state?.analysisResult) {
+        const analysisResult = location.state.analysisResult;
+        
+        const transformedResult = {
+          id: analysisResult.file_id,
+          filename: analysisResult.filename,
+          uploadDate: new Date(analysisResult.created_at).toLocaleDateString(),
+          uploadTime: new Date(analysisResult.created_at).toLocaleTimeString(),
+          status: 'completed',
+          confidence: analysisResult.detection_result.confidence_score,
+          isDeepfake: analysisResult.detection_result.is_deepfake,
+          analysisTime: `${analysisResult.detection_result.processing_time_seconds.toFixed(1)}s`,
+          createdAt: analysisResult.created_at,
+          detectionResult: analysisResult.detection_result,
+          // Try different possible field names for file URL
+          fileUrl: analysisResult.file_url || analysisResult.file_path || analysisResult.url || analysisResult.media_url || constructFileUrl(analysisResult.file_id, analysisResult.filename),
+          // Try different possible field names for file size
+          fileSize: analysisResult.file_size || analysisResult.size || analysisResult.fileSize || 'Unknown',
+          // Try different possible field names for file type
+          fileType: analysisResult.file_type || analysisResult.mime_type || analysisResult.content_type || analysisResult.type || 'Unknown'
+        };
+        
+        setResult(transformedResult);
+        setLoading(false);
+        return;
+      }
+      
+      // Fallback to API fetch for existing results
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Request timeout')), 10000)
       );
@@ -71,7 +100,7 @@ const Results = () => {
     } finally {
       setLoading(false);
     }
-  }, [fileId, clearError, handleError]);
+  }, [fileId, clearError, handleError, location.state]);
 
   const fetchAllResults = useCallback(async () => {
     setLoading(true);
@@ -928,6 +957,86 @@ const Results = () => {
                   </small>
                 </div>
               </div>
+
+              {/* Multi-Model Information */}
+              {result.detectionResult?.analysis_metadata?.method === 'multi-model-ensemble' && (
+                <div className="mb-4">
+                  <h6 className="mb-3">
+                    <i className="fas fa-layer-group me-2 text-primary"></i>
+                    Multi-Model Analysis
+                  </h6>
+                  <div className="row">
+                    <div className="col-12">
+                      <div className="alert alert-info">
+                        <i className="fas fa-info-circle me-2"></i>
+                        This analysis used an ensemble of {result.detectionResult.analysis_metadata?.models_used?.length || 0} models for enhanced accuracy.
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Individual Model Results */}
+                  {result.detectionResult.analysis_metadata?.individual_results && (
+                    <div className="row">
+                      {Object.entries(result.detectionResult.analysis_metadata.individual_results).map(([modelName, modelResult]) => (
+                        <div key={modelName} className="col-md-4 mb-3">
+                          <div className="card border-0 bg-light">
+                            <div className="card-body p-3">
+                              <h6 className="card-title text-capitalize mb-2">
+                                {modelName.replace(/([A-Z])/g, ' $1').trim()}
+                              </h6>
+                              <div className="d-flex justify-content-between align-items-center mb-2">
+                                <span className="text-muted">Confidence:</span>
+                                <span className={`badge bg-${getConfidenceColor(modelResult.confidence_score)}`}>
+                                  {modelResult.confidence_score.toFixed(1)}%
+                                </span>
+                              </div>
+                              <div className="d-flex justify-content-between align-items-center">
+                                <span className="text-muted">Prediction:</span>
+                                <span className={`badge bg-${modelResult.is_deepfake ? 'danger' : 'success'} badge-sm`}>
+                                  {modelResult.is_deepfake ? 'FAKE' : 'REAL'}
+                                </span>
+                              </div>
+                              <div className="mt-2">
+                                <small className="text-muted">
+                                  Processing: {modelResult.processing_time?.toFixed(2)}s
+                                </small>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Ensemble Information */}
+                  <div className="row mt-3">
+                    <div className="col-12">
+                      <div className="card border-0 bg-primary bg-opacity-10">
+                        <div className="card-body p-3">
+                          <h6 className="card-title text-primary mb-2">
+                            <i className="fas fa-cogs me-2"></i>
+                            Ensemble Result
+                          </h6>
+                          <div className="row">
+                            <div className="col-md-6">
+                              <small className="text-muted">Method:</small><br/>
+                              <span className="fw-bold text-capitalize">
+                                {result.detectionResult.analysis_metadata?.ensemble_method?.replace(/_/g, ' ') || 'Weighted Average'}
+                              </span>
+                            </div>
+                            <div className="col-md-6">
+                              <small className="text-muted">Total Processing Time:</small><br/>
+                              <span className="fw-bold">
+                                {result.detectionResult.analysis_metadata?.processing_time?.toFixed(2)}s
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Metadata */}
               <div className="row">
