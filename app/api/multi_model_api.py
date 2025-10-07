@@ -36,6 +36,7 @@ from ..models.deepfake_models import ResNetDetector, EfficientNetDetector, F3Net
 from ..models.model_selector import ModelSelector
 from ..models.preprocessing_manager import UnifiedPreprocessingManager
 from ..models.adaptive_weighting import AdaptiveWeighting, WeightingStrategy, EnsemblePruningMode, WeightingContext
+from ..models.parallel_processor import ParallelProcessingManager, ProcessingPriority
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -108,6 +109,12 @@ class MultiModelAPI:
         self.adaptive_weighting = AdaptiveWeighting(
             strategy=WeightingStrategy.HYBRID,
             pruning_mode=EnsemblePruningMode.ADAPTIVE
+        )
+        
+        # Initialize parallel processing manager
+        self.parallel_processor = ParallelProcessingManager(
+            max_gpu_memory=8.0,  # 8GB GPU memory limit
+            max_workers=8
         )
         
         # Task tracking
@@ -185,18 +192,18 @@ class MultiModelAPI:
                 image, models, use_cache=True
             )
             
-            # Process with selected models using preprocessed images
-            model_results = await self._process_with_preprocessed_images(
-                preprocessing_result, model_instances
+            # Process with selected models using parallel processing
+            model_results = await self.parallel_processor.process_models_parallel(
+                model_instances, preprocessing_result.processed_images, input_analysis.complexity.value
             )
             
             # Create weighting context
             weighting_context = WeightingContext(
                 input_complexity=input_analysis.complexity.value,
-                model_confidences={name: result.confidence_score for name, result in model_results.items()},
+                model_confidences={name: result.confidence for name, result in model_results.items()},
                 model_correlations={},  # Will be calculated by adaptive weighting
                 historical_performance={},  # Will be retrieved from adaptive weighting
-                uncertainty_scores={name: 1.0 - (result.confidence_score / 100.0) for name, result in model_results.items()},
+                uncertainty_scores={name: 1.0 - (result.confidence / 100.0) for name, result in model_results.items()},
                 processing_time=preprocessing_result.preprocessing_time,
                 memory_usage=0.0  # Could be calculated if needed
             )
@@ -900,4 +907,104 @@ async def analyze_image_maximum_optimization(file: UploadFile = File(...)):
         
     except Exception as e:
         logger.error(f"Maximum optimization analysis failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+
+@router.get("/parallel-processing/info")
+async def get_parallel_processing_info():
+    """Get information about parallel processing capabilities"""
+    try:
+        if not hasattr(api_instance, 'parallel_processor'):
+            raise HTTPException(status_code=503, detail="Parallel processor not available")
+        
+        processor = api_instance.parallel_processor
+        
+        return {
+            "parallel_processing_enabled": True,
+            "max_gpu_memory": processor.resource_allocator.max_gpu_memory,
+            "max_workers": processor.concurrent_executor.max_workers,
+            "gpu_available": processor.resource_allocator.gpu_available,
+            "resource_status": processor.resource_allocator.get_resource_status(),
+            "performance_stats": processor.get_optimization_stats()
+        }
+        
+    except Exception as e:
+        logger.error(f"Parallel processing info failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get parallel processing info: {str(e)}")
+
+
+@router.post("/parallel-processing/warmup")
+async def warmup_models():
+    """Warm up all models to reduce first-run latency"""
+    try:
+        if not hasattr(api_instance, 'parallel_processor'):
+            raise HTTPException(status_code=503, detail="Parallel processor not available")
+        
+        # Get available models
+        available_models = {name: model for name, model in api_instance.registry.models.items() if model.is_loaded()}
+        
+        if not available_models:
+            raise HTTPException(status_code=400, detail="No models available for warmup")
+        
+        # Warm up models
+        api_instance.parallel_processor.concurrent_executor.warmup_models(available_models)
+        
+        return {
+            "message": "Model warmup completed successfully",
+            "models_warmed": list(available_models.keys()),
+            "warmup_stats": api_instance.parallel_processor.concurrent_executor.get_performance_stats()
+        }
+        
+    except Exception as e:
+        logger.error(f"Model warmup failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Model warmup failed: {str(e)}")
+
+
+@router.post("/analyze/ultimate-optimization")
+async def analyze_image_ultimate_optimization(file: UploadFile = File(...)):
+    """Analyze image with ultimate optimization (all 4 phases combined)"""
+    try:
+        # Validate file type
+        if not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="File must be an image")
+        
+        # Read and process image
+        image_data = await file.read()
+        image = Image.open(io.BytesIO(image_data))
+        
+        # Convert to RGB if necessary
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        
+        # Analyze with ultimate optimization
+        result = await api_instance.analyze_image_multi_model(image)
+        
+        # Get all optimization stats
+        preprocessing_stats = api_instance.preprocessing_manager.get_performance_stats()
+        weighting_stats = api_instance.adaptive_weighting.get_performance_stats()
+        parallel_stats = api_instance.parallel_processor.get_optimization_stats()
+        
+        return {
+            "task_id": result.task_id,
+            "overall_confidence": result.overall_confidence,
+            "overall_verdict": result.overall_verdict,
+            "processing_time": result.processing_time,
+            "model_results": {
+                name: {
+                    "confidence": model_result.confidence,
+                    "is_deepfake": model_result.is_deepfake,
+                    "inference_time": model_result.inference_time
+                } for name, model_result in result.model_results.items()
+            },
+            "optimization_info": result.metadata,
+            "preprocessing_stats": preprocessing_stats,
+            "weighting_stats": weighting_stats,
+            "parallel_stats": parallel_stats,
+            "ultimate_optimization": True,
+            "phases_active": ["model_selection", "unified_preprocessing", "adaptive_weighting", "parallel_processing"],
+            "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        logger.error(f"Ultimate optimization analysis failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}") 
