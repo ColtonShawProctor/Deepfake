@@ -82,10 +82,10 @@ python3 test_all_demo_images.py
 ### API Testing
 ```bash
 # Test the API endpoints
-python3 test_api_integration.py
+python3 scripts/test_api_integration.py
 
 # Test model on demo data
-python3 test_model_on_demo_data.py
+python3 scripts/test_model_on_demo_data.py
 ```
 
 ---

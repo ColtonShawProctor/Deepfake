@@ -85,3 +85,15 @@ evaluation_results/
 # Temporary files
 *.tmp
 *.temp 
+# Ad-hoc test/demo/debug scripts relocated from the repo root
+# (test_*.py above only matches root-level files)
+scripts/test_*.py
+scripts/test_*.html
+scripts/debug_*.py
+scripts/demo_*.py
+scripts/find_*.py
+scripts/select_*.py
+scripts/final_demo_images.py
+scripts/fix_passwords.py
+scripts/upload_image.py
+scripts/upload_video.py
