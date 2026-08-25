@@ -43,6 +43,12 @@ test_samples/
 *.db
 *.sqlite
 *.sqlite3
+*.db-shm
+*.db-wal
+*.db-journal
+
+# Installer packages
+*.pkg
 
 # Logs and reports
 *.log
